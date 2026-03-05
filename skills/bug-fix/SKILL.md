@@ -32,6 +32,40 @@ This separation ensures:
 
 ---
 
+## Phase 0: Traceability Check (run FIRST, before anything else)
+
+Check if `traceability.md` exists in the project root:
+
+```bash
+cat traceability.md 2>/dev/null || echo "NO TRACEABILITY FILE"
+```
+
+**If it exists**, read it and extract:
+
+| Field | What to look for |
+|-------|-----------------|
+| **Goal** | What was the agent originally trying to build? |
+| **Steps** | Which steps are `✅ Done`, `🔄 In Progress`, `❌ Blocked`, `⏳ Pending`? |
+| **Files Changed** | Which files has the agent already touched? |
+| **Decisions** | What architectural choices were made? Do any conflict with the current bug? |
+| **Deviations** | Has the agent already noted straying from plan? |
+
+Then produce a **Traceability Summary** before moving to Phase 1:
+
+```
+## Traceability Summary
+- Goal: [from traceability.md]
+- Last active step: [step # and description, with status]
+- Steps completed: X / Y
+- Files touched so far: [list]
+- Known deviations: [from Deviations section, or "none"]
+- Likely deviation point: [your assessment of where actual behavior diverged from plan]
+```
+
+**If no traceability.md exists**, note it and continue with standard Phase 1 investigation.
+
+---
+
 ## Phase 1: Bug Identification (Main Agent)
 
 ### Step 1.1: Gather Context
@@ -40,16 +74,17 @@ Run in parallel:
 - Read the error message/stack trace carefully
 - Identify the failing file(s) and line numbers
 - Fire `explore` agent to search for related code
-- Check recent changes that might have caused it
+- **Cross-reference with traceability.md** — if the failing file is in "Files Changed", the bug was introduced during this task; if not, it may be a pre-existing issue or regression
 
 ### Step 1.2: Reproduce Understanding
 
-| Question | Purpose |
-|----------|---------|
-| What is the expected behavior? | Define success |
-| What is the actual behavior? | Understand the symptom |
+| Question | Where to look |
+|----------|--------------|
+| What is the expected behavior? | Traceability **Goal** + user description |
+| What is the actual behavior? | Error message / symptom |
 | When does it occur? | Identify triggers |
-| What changed recently? | Find root cause candidates |
+| What changed recently? | Traceability **Files Changed** + `git diff` |
+| Does it match a known deviation? | Traceability **Deviations** section |
 
 ### Step 1.3: Root Cause Analysis
 
@@ -60,6 +95,8 @@ Run in parallel:
 5. Identify the ACTUAL root cause (not just symptoms)
 
 **For common bug patterns, see:** `examples.md` in this folder
+
+**Silent failures (no error, no output):** When the UI shows nothing but there's no error message, use the **split-testing methodology** from Example 3 — test each layer (backend → proxy → frontend) independently. Add a visible debug state panel to the UI when browser DevTools isn't available. See `examples.md` Example 3 for the full technique.
 
 ---
 
@@ -259,6 +296,17 @@ REPORT BACK:
 | Success criteria met? | Investigate why, create new plan if needed |
 | No new errors? | Fix introduced regressions |
 | Verification passed? | Debug verification failure |
+
+### Update traceability.md (if it exists)
+
+After confirming the fix works, update `traceability.md`:
+
+- Add the bug to **Deviations**: what deviated, which step caused it, and the fix applied
+- Update any steps that were marked `🔄 In Progress` or `❌ Blocked` to `✅ Done` if the fix resolves them
+- Add any new files modified by the fix to **Files Changed**
+- Add a **Test Results** entry for the verification outcome
+
+This keeps the traceability file accurate for the full task history.
 
 ### Final Verification
 

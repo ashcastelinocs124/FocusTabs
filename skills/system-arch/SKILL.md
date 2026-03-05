@@ -29,14 +29,53 @@ description: Use when planning major architecture changes, evaluating architectu
 | Dependencies | Check imports, configs |
 | Constraints | Technical, business, resource |
 
-### Step 1.2: Understand Proposed Change
+### Step 1.2: Understand Proposed Change (BLOCKING — use AskUserQuestion)
 
-| Question | Purpose |
-|----------|---------|
-| What is the goal? | Define success criteria |
-| What components affected? | Scope the impact |
-| What are the requirements? | Functional & non-functional |
-| What constraints exist? | Identify limitations |
+Use `AskUserQuestion` to gather context before doing any analysis. Ask one question at a time:
+
+**Question 1 — Goal:**
+```
+question: "What is the primary goal of this architecture change?"
+header: "Goal"
+options:
+  - label: "Performance / scalability"
+    description: "The system is too slow or can't handle load"
+  - label: "Maintainability / simplicity"
+    description: "The current code is too hard to change or understand"
+  - label: "New capability"
+    description: "Adding functionality that doesn't exist yet"
+  - label: "Cost reduction"
+    description: "Current approach is too expensive to run or build"
+```
+
+**Question 2 — Urgency:**
+```
+question: "What is the timeline pressure on this decision?"
+header: "Urgency"
+options:
+  - label: "Exploratory — no deadline"
+    description: "Just thinking through options, no immediate action needed"
+  - label: "Soon — weeks"
+    description: "Need to start implementation within a few weeks"
+  - label: "Now — days"
+    description: "Need a decision and implementation to start immediately"
+```
+
+**Question 3 — Constraints (multiSelect: true):**
+```
+question: "What constraints apply? (select all that apply)"
+header: "Constraints"
+multiSelect: true
+options:
+  - label: "Must not break existing API"
+    description: "Backwards compatibility required"
+  - label: "Limited dev time"
+    description: "Can't take on a large implementation"
+  - label: "No new dependencies"
+    description: "Can't add new libraries or services"
+  - label: "No constraints"
+    description: "Open to any approach"
+```
 
 ---
 
@@ -107,6 +146,26 @@ description: Use when planning major architecture changes, evaluating architectu
 ### Recommendation
 [Which option and why]
 ```
+
+### Option Selection (BLOCKING — use AskUserQuestion after presenting the matrix)
+
+After presenting the trade-off matrix and your recommendation, use `AskUserQuestion`:
+
+```
+question: "Which approach do you want to go with?"
+header: "Architecture choice"
+options:
+  - label: "Option A — [name]"          ← your recommended option, listed first
+    description: "[One-line summary of Option A]"
+  - label: "Option B — [name]"
+    description: "[One-line summary of Option B]"
+  - label: "Option C — [name]"          ← only if a third option exists
+    description: "[One-line summary of Option C]"
+  - label: "None — rethink the approach"
+    description: "None of these feel right, let's reconsider"
+```
+
+Do NOT proceed to Phase 5 until the user has selected an option.
 
 ---
 
@@ -236,6 +295,26 @@ description: Use when planning major architecture changes, evaluating architectu
 
 ## Phase 7: Transition to Implementation (MANDATORY)
 
+### Architecture Approval Gate (BLOCKING — use AskUserQuestion)
+
+After presenting the full ADR, use `AskUserQuestion` before invoking `/code-implementation`:
+
+```
+question: "Architecture decision ready. How do you want to proceed?"
+header: "Next step"
+options:
+  - label: "Approve — start implementation"
+    description: "Architecture looks good, invoke /code-implementation now"
+  - label: "Revise — change something"
+    description: "Go back and adjust the decision or trade-off analysis"
+  - label: "Save ADR only — implement later"
+    description: "Record the decision but don't start coding yet"
+```
+
+- If "Approve": immediately invoke `/code-implementation` with the ADR context.
+- If "Revise": ask what to change, update the ADR, re-present, and ask again.
+- If "Save ADR only": write ADR to `docs/decisions/` and stop.
+
 **After architecture is approved by user:**
 
 1. **IMMEDIATELY invoke the code-implementation skill**
@@ -305,8 +384,21 @@ Assistant: "Great! I'll now transition to implementation. Invoking /code-impleme
 - Security or performance concerns
 - Cross-cutting concerns affect many systems
 
-**Ask User if:**
+**Ask User if** (use AskUserQuestion — do not ask as plain text):
 - Business constraints unclear
 - Resource availability unknown
 - Timeline requirements ambiguous
 - Stakeholder priorities needed
+
+For these, use a targeted `AskUserQuestion` with the specific unknown as the question and 2-4 concrete options. Example:
+```
+question: "What is the budget constraint for this change?"
+header: "Budget"
+options:
+  - label: "No constraint"
+    description: "Cost is not a limiting factor"
+  - label: "Minimal — reuse what we have"
+    description: "Can't add new paid services or infra"
+  - label: "Moderate — one new service ok"
+    description: "Can add one new dependency if justified"
+```

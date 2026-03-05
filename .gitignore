@@ -1,0 +1,5 @@
+settings.local.json
+__pycache__/
+*.pyc
+.DS_Store
+mcp/servers.json

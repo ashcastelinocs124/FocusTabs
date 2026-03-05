@@ -44,6 +44,59 @@ If you implement a backend endpoint without surfacing it in the UI, the feature 
 - Note non-functional needs (tests, types, logging, telemetry)
 - **Frontend surface audit:** Which pages/components consume this data? What new UI is needed?
 
+### Phase 1.5: Traceability Setup (for large tasks)
+
+**A task is "large" if ANY of these apply:**
+- Touches 3+ files
+- Has 3+ distinct implementation steps
+- Involves both backend AND frontend
+- Spans multiple phases or components
+- Will take more than one logical session
+
+**If the task is large, create `traceability.md` in the project root BEFORE writing any code:**
+
+```markdown
+# Traceability — [Task Name]
+**Started:** YYYY-MM-DD
+**Goal:** [One-line description]
+**Status:** 🔄 In Progress
+
+## Steps
+| # | Step | Status | Files Touched | Notes |
+|---|------|--------|---------------|-------|
+| 1 | [step description] | ⏳ Pending | — | |
+| 2 | [step description] | ⏳ Pending | — | |
+
+## Decisions
+| Decision | Rationale |
+|----------|-----------|
+
+## Files Changed
+| File | Change | Status |
+|------|--------|--------|
+
+## Test Results
+| Test | Result | Notes |
+|------|--------|-------|
+
+## Deviations
+_None yet._
+
+## Completion
+**Status:** In Progress
+```
+
+**Update rules — keep traceability.md live throughout the task:**
+- Mark a step `🔄 In Progress` when you start it
+- Mark it `✅ Done` when complete, or `❌ Blocked` if stuck — add a note
+- Add every file you create or modify to **Files Changed** as you go
+- Log every architectural decision to **Decisions** as it's made
+- Add test results to **Test Results** after each test run
+- Add anything that deviates from the original plan to **Deviations**
+- On completion, set top-level **Status** to `✅ Complete` or `⚠️ Partial`
+
+**Do NOT update traceability.md in bulk at the end — update it step by step as you work.**
+
 ### Phase 2: Plan (checklist-driven)
 Produce a concise plan before coding:
 - Scope & assumptions
@@ -176,6 +229,7 @@ MUST NOT DO: [Forbidden actions]
 ### Phase 6: Summarize
 - Summarize changes, tests run, and status vs plan
 - Call out any deviations or TODOs
+- **If traceability.md exists:** finalize it — mark all completed steps `✅ Done`, set top-level Status to `✅ Complete` (or `⚠️ Partial` if anything was skipped), fill in the Completion timestamp
 
 ### Phase 7: Explain (only if user asks)
 - If the user requests an explanation of the new code, use the **Explain** skill (/explain) or the **tutor** agent to provide a concise walkthrough (what it does, how it works, key flows)
@@ -235,3 +289,4 @@ MUST NOT DO: [Forbidden actions]
 **Final:**
 - [ ] code-reviewer agent run and feedback addressed
 - [ ] Summary delivered to user with test results
+- [ ] `traceability.md` finalized (if task was large) — all steps marked, status set to ✅ Complete
