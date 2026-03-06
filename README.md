@@ -18,20 +18,20 @@ Global skills, agents, and settings used across all projects.
 |-------|---------|
 | `code-implementation` | Plan → approve → implement → review cycle |
 | `bug-fix` | Root cause analysis + targeted fix with traceability.md integration |
-| `gitpush` | Safe push with secret scanning, branch/README hooks, confirmation gate |
+| `gitpush` | Safe push with secret scanning, repo selection, .gitignore audit, confirmation gate |
 | `system-arch` | Architecture decisions with AskUserQuestion gates at each phase |
 | `code-reviewer` | Validate implementation against plan and coding standards |
 | `skill-creator` | Guide for building new skills |
-| `capture-learnings` | Extract session learnings to learnings.md + improve skills |
-| `debate` | Stress-test architecture proposals |
+| `capture-learnings` | Extract session learnings to learnings.md + improve skills (review gate before write) |
+| `debate` | Interactive architecture challenge — one question at a time via AskUserQuestion until mutual confidence |
 | `frontend-design` | Production-grade UI implementation |
 | `superdesign` | Design-first UI/UX agent |
 | `validation` | Brutally honest architecture feedback |
 | `integration-test-validator` | Comprehensive test suite validation |
 | `investigator` | Deep root-cause investigation |
 | `summarize` | Structured session summaries |
-| `gitpush` | Safe GitHub push workflow |
 | `landing-page` | High-converting landing page generation |
+| `screen-recording` | Polished screen recording from a single prompt — browser capture, trimming, zooms |
 
 ## Agents
 

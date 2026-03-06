@@ -31,6 +31,39 @@ git config user.name "ashcastelinocs124"
 git config user.email "ashleyn4@illinois.edu"
 ```
 
+### Step 1.5 — Repo selection when no remote is set (BLOCKING — use AskUserQuestion)
+
+**Trigger:** `git remote -v` returns empty output OR the user did not provide a repo URL.
+
+Run:
+```bash
+gh repo list ashcastelinocs124 --limit 5 --json name,url,updatedAt --sort updated
+```
+
+This returns the 5 most recently updated repos. Build an `AskUserQuestion` from the results:
+
+```
+question: "No remote is set. Which GitHub repo should this be pushed to?"
+header: "Target repo"
+options:
+  - label: "<repo-name-1>"
+    description: "Last updated: <updatedAt> — github.com/ashcastelinocs124/<repo-name-1>"
+  - label: "<repo-name-2>"
+    description: "Last updated: <updatedAt> — github.com/ashcastelinocs124/<repo-name-2>"
+  - label: "<repo-name-3>"
+    description: "Last updated: <updatedAt> — ..."
+  - label: "Paste a link"
+    description: "I'll provide the full repo URL myself"
+```
+
+- If user selects a repo from the list: set remote with `git remote add origin <url>` then continue.
+- If user selects "Paste a link" or types "Other": ask them to provide the full URL, then `git remote add origin <url>`.
+- If `gh` is not authenticated or fails: skip to the "Paste a link" fallback directly.
+
+**Do not assume or guess a repo. Always ask.**
+
+---
+
 ### Step 2 — Branch selection (BLOCKING — use AskUserQuestion)
 
 Use the `AskUserQuestion` tool to ask which branch to push to. Build the options dynamically from `git branch -a` output:
@@ -77,6 +110,10 @@ options:
 
 If sensitive files are staged or modified, **stop and ask** the user what to do.
 
+**Also audit `.gitignore` coverage before staging:**
+- `.env` in `.gitignore` does NOT match `.env.local` or `.env.*` — check that all dotenv variants are covered
+- If `.gitignore` is missing `.env.*` or `.env.local`, offer to add them before proceeding with `git add`
+
 ### Step 4 — Show final confirmation summary + AskUserQuestion gate (BLOCKING — do not skip)
 
 Display the summary to the user:
@@ -114,12 +151,13 @@ If they select "No, cancel" or "Other", abort immediately and tell the user noth
 User: "push my changes"
 Assistant:
 1. Run status/diff/remote/branch checks + fix git identity if needed.
-2. AskUserQuestion → "Which branch?" (options: current branch / main / new branch)
-3. AskUserQuestion → "Does the README need updating?" (yes / no / create)
-4. Scan for sensitive files — stop if any found.
-5. Show confirmation summary (repo, branch, files, commit message, author).
-6. AskUserQuestion → "Are you sure you want to push?" (Yes, push it / No, cancel)
-7. Commit and push only after explicit "Yes, push it".
+2. **If no remote set:** run `gh repo list` → AskUserQuestion with last 5 repos + "Paste a link" option → set remote.
+3. AskUserQuestion → "Which branch?" (options: current branch / main / new branch)
+4. AskUserQuestion → "Does the README need updating?" (yes / no / create)
+5. Scan for sensitive files — stop if any found.
+6. Show confirmation summary (repo, branch, files, commit message, author).
+7. AskUserQuestion → "Are you sure you want to push?" (Yes, push it / No, cancel)
+8. Commit and push only after explicit "Yes, push it".
 
 ---
 
