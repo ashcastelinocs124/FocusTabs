@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>FocusTabs</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <span class="logo">FocusTabs</span>
+    <div class="tabs-nav">
+      <button class="tab-btn active" data-tab="analyze">Analyze</button>
+      <button class="tab-btn" data-tab="archive">Archive</button>
+    </div>
+    <button class="settings-btn" id="settings-btn" title="Settings">&#9881;</button>
+  </header>
+
+  <!-- Analyze panel -->
+  <div id="panel-analyze" class="panel">
+    <!-- Idle state -->
+    <div id="state-idle">
+      <p class="tab-count" id="tab-count">Loading...</p>
+      <p class="focus-label">Focus: <span id="focus-title">&mdash;</span></p>
+      <button class="primary-btn" id="analyze-btn">Analyze My Tabs</button>
+    </div>
+
+    <!-- Loading state -->
+    <div id="state-loading" class="hidden">
+      <p class="loading-msg">Analyzing your tabs...</p>
+      <div class="spinner"></div>
+    </div>
+
+    <!-- Error state -->
+    <div id="state-error" class="hidden">
+      <p class="error-msg" id="error-msg"></p>
+      <button class="secondary-btn" id="retry-btn">Try Again</button>
+    </div>
+
+    <!-- Results state -->
+    <div id="state-results" class="hidden">
+      <p class="results-header" id="results-header"></p>
+      <ul class="suggestions-list" id="suggestions-list"></ul>
+      <div class="results-actions">
+        <button class="primary-btn" id="archive-btn">Archive &amp; Close (<span id="close-count">0</span>)</button>
+        <button class="secondary-btn" id="cancel-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Archive panel -->
+  <div id="panel-archive" class="panel hidden">
+    <p class="archive-empty hidden" id="archive-empty">No archived tabs yet.</p>
+    <ul class="archive-list" id="archive-list"></ul>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
