@@ -3,6 +3,7 @@
 const DEFAULTS = {
   apiKey: '',
   model: 'gpt-5-mini',
+  userContext: '',
 };
 
 const MODELS = {
@@ -69,16 +70,17 @@ function storageSet(obj) {
 }
 
 async function getSettings() {
-  const data = await storageGet(['apiKey', 'model']);
+  const data = await storageGet(['apiKey', 'model', 'userContext']);
   const apiKey = data.apiKey ?? DEFAULTS.apiKey;
   return {
     apiKey,
     model: normalizeModelForUser({ apiKey, model: data.model }),
+    userContext: data.userContext ?? DEFAULTS.userContext,
   };
 }
 
-async function saveSettings({ apiKey = DEFAULTS.apiKey, model = DEFAULTS.model } = {}) {
-  await storageSet({ apiKey, model: normalizeModelForUser({ apiKey, model }) });
+async function saveSettings({ apiKey = DEFAULTS.apiKey, model = DEFAULTS.model, userContext = DEFAULTS.userContext } = {}) {
+  await storageSet({ apiKey, model: normalizeModelForUser({ apiKey, model }), userContext });
 }
 
 async function addDecision(decision) {

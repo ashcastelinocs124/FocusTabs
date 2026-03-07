@@ -285,7 +285,7 @@ function sendMessage(msg) {
 
 function getFrontendSettings() {
   return new Promise((resolve) => {
-    chrome.storage.local.get(["apiKey", "model"], (data) => {
+    chrome.storage.local.get(["apiKey", "model", "userContext"], (data) => {
       if (chrome.runtime.lastError) {
         resolve({});
         return;
@@ -293,6 +293,7 @@ function getFrontendSettings() {
       resolve({
         apiKey: data.apiKey ?? "",
         model: data.model ?? "gpt-5-mini",
+        userContext: data.userContext ?? "",
       });
     });
   });

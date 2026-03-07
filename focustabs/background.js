@@ -4,7 +4,7 @@
 
 // ─── Storage helpers ─────────────────────────────────────────────────────────
 
-const DEFAULTS = { apiKey: '', model: 'gpt-5-mini' };
+const DEFAULTS = { apiKey: '', model: 'gpt-5-mini', userContext: '' };
 const DECISIONS_CAP = 100;
 const AUTO_POPUP_THRESHOLD = 10;
 const AUTO_POPUP_COOLDOWN_MS = 2 * 60 * 1000;
@@ -34,11 +34,12 @@ function storageSet(obj) {
 }
 
 async function getSettings() {
-  const data = await storageGet(['apiKey', 'model']);
+  const data = await storageGet(['apiKey', 'model', 'userContext']);
   const apiKey = data.apiKey ?? DEFAULTS.apiKey;
   return {
     apiKey,
     model: normalizeModelForUser({ apiKey, model: data.model }),
+    userContext: data.userContext ?? DEFAULTS.userContext,
   };
 }
 
@@ -186,10 +187,11 @@ async function injectInlinePrompt(tabId) {
       analyzeBtn.addEventListener('click', () => {
         analyzeBtn.disabled = true;
         status.textContent = 'Analyzing your tabs...';
-        chrome.storage.local.get(['apiKey', 'model'], (data) => {
+        chrome.storage.local.get(['apiKey', 'model', 'userContext'], (data) => {
           const apiKey = data?.apiKey ?? '';
           const model = data?.model ?? 'gpt-5-mini';
-          chrome.runtime.sendMessage({ type: 'ANALYZE', apiKey, model }, (result) => {
+          const userContext = data?.userContext ?? '';
+          chrome.runtime.sendMessage({ type: 'ANALYZE', apiKey, model, userContext }, (result) => {
             analyzeBtn.disabled = false;
             if (chrome.runtime.lastError) {
               status.textContent = `Error: ${chrome.runtime.lastError.message}`;
@@ -299,7 +301,7 @@ function sanitizeField(value) {
   return String(value);
 }
 
-function buildPrompt(activeTab, otherTabs, decisions) {
+function buildPrompt(activeTab, otherTabs, decisions, userContext = '') {
   const tabList = otherTabs
     .map(
       (t) =>
@@ -320,6 +322,9 @@ function buildPrompt(activeTab, otherTabs, decisions) {
   Title: "${sanitizeField(activeTab.title)}"
   URL: "${sanitizeField(activeTab.url)}"
   Summary: "${sanitizeField(activeTab.summary)}"
+
+User context and priorities:
+${userContext ? `  ${sanitizeField(userContext)}` : '  (not provided)'}
 
 Other open tabs:
 ${tabList || '  (none)'}
@@ -635,6 +640,7 @@ async function getEffectiveSettings(message = {}) {
   const fromFrontend = {
     apiKey: message.apiKey ?? '',
     model: message.model ?? DEFAULTS.model,
+    userContext: message.userContext ?? '',
   };
   const normalizedFromFrontend = {
     apiKey: fromFrontend.apiKey,
@@ -643,11 +649,12 @@ async function getEffectiveSettings(message = {}) {
   const fallbackSettings = await getSettings();
   const apiKey = normalizedFromFrontend.apiKey || fallbackSettings.apiKey;
   const model = normalizedFromFrontend.apiKey ? normalizedFromFrontend.model : fallbackSettings.model;
-  return { apiKey, model };
+  const userContext = fromFrontend.userContext || fallbackSettings.userContext || '';
+  return { apiKey, model, userContext };
 }
 
 async function handleAnalyze(message = {}) {
-  const { apiKey, model } = await getEffectiveSettings(message);
+  const { apiKey, model, userContext } = await getEffectiveSettings(message);
 
   if (!apiKey) throw new Error('API key not set. Open Settings to configure your key.');
 
@@ -677,7 +684,7 @@ async function handleAnalyze(message = {}) {
   );
 
   const decisions = await getDecisions();
-  const userMessage = buildPrompt(activeFocus, summaries, decisions);
+  const userMessage = buildPrompt(activeFocus, summaries, decisions, userContext);
   const llmResults = await callLLM({ model, apiKey, systemMessage: SYSTEM_MESSAGE, userMessage });
 
   const suggestions = llmResults
@@ -699,7 +706,7 @@ async function handleAnalyze(message = {}) {
 }
 
 async function handleChatTabs(message = {}) {
-  const { apiKey, model } = await getEffectiveSettings(message);
+  const { apiKey, model, userContext } = await getEffectiveSettings(message);
   if (!apiKey) throw new Error('API key not set. Open Settings to configure your key.');
 
   const query = String(message.query ?? '').trim();
@@ -733,6 +740,9 @@ async function handleChatTabs(message = {}) {
 Title: "${sanitizeField(activeContext?.title ?? 'unknown')}"
 URL: "${sanitizeField(activeContext?.url ?? '')}"
 Summary snippet: "${sanitizeField(activeContext?.summary ?? '')}"
+
+User context and priorities:
+${userContext ? sanitizeField(userContext) : '(not provided)'}
 
 Conversation history:
 ${buildConversationHistory(history)}

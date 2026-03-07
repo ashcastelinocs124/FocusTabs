@@ -6,6 +6,7 @@ const saveBtn = document.getElementById('save-btn');
 const statusEl = document.getElementById('status');
 const errorEl = document.getElementById('error-msg');
 const autoPromptEnabledInput = document.getElementById('auto-prompt-enabled');
+const userContextInput = document.getElementById('user-context');
 
 const DEFAULT_MODEL = 'gpt-5-mini';
 const MODEL_PROVIDER = {
@@ -49,7 +50,7 @@ function getModelLabel(model) {
 async function loadSettings() {
   try {
     const data = await new Promise((resolve, reject) =>
-      chrome.storage.local.get(['apiKey', 'model', 'autoPromptEnabled'], (result) => {
+      chrome.storage.local.get(['apiKey', 'model', 'autoPromptEnabled', 'userContext'], (result) => {
         if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
         else resolve(result);
       })
@@ -59,6 +60,7 @@ async function loadSettings() {
     apiKeyInput.value = apiKey;
     modelSelect.value = model;
     autoPromptEnabledInput.checked = Boolean(data.autoPromptEnabled);
+    userContextInput.value = data.userContext ?? '';
   } catch (err) {
     showError('Failed to load settings: ' + err.message);
   }
@@ -70,6 +72,7 @@ saveBtn.addEventListener('click', async () => {
   const model = modelSelect.value;
   const normalizedModel = normalizeModelForUser({ apiKey, model });
   const autoPromptEnabled = autoPromptEnabledInput.checked;
+  const userContext = userContextInput.value.trim();
 
   hideMessages();
 
@@ -82,7 +85,7 @@ saveBtn.addEventListener('click', async () => {
 
   try {
     await new Promise((resolve, reject) =>
-      chrome.storage.local.set({ apiKey, model: normalizedModel, autoPromptEnabled }, () => {
+      chrome.storage.local.set({ apiKey, model: normalizedModel, autoPromptEnabled, userContext }, () => {
         if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
         else resolve();
       })

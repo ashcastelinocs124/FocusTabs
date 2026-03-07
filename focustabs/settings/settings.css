@@ -28,7 +28,8 @@ label {
 }
 
 select,
-input[type='password'] {
+input[type='password'],
+textarea {
   width: 100%;
   padding: 8px 10px;
   border: 1px solid #d0d0d0;
@@ -39,9 +40,15 @@ input[type='password'] {
 }
 
 select:focus,
-input[type='password']:focus {
+input[type='password']:focus,
+textarea:focus {
   outline: none;
   border-color: #1a1a1a;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 90px;
 }
 
 .hint {
