@@ -5,12 +5,24 @@ const DEFAULTS = {
   model: 'gpt-4o',
 };
 
+const DECISIONS_CAP = 100; // max stored decisions
+
 function storageGet(keys) {
-  return new Promise((resolve) => chrome.storage.local.get(keys, resolve));
+  return new Promise((resolve, reject) =>
+    chrome.storage.local.get(keys, (data) => {
+      if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+      else resolve(data);
+    })
+  );
 }
 
 function storageSet(obj) {
-  return new Promise((resolve) => chrome.storage.local.set(obj, resolve));
+  return new Promise((resolve, reject) =>
+    chrome.storage.local.set(obj, () => {
+      if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+      else resolve();
+    })
+  );
 }
 
 async function getSettings() {
@@ -21,7 +33,7 @@ async function getSettings() {
   };
 }
 
-async function saveSettings({ apiKey, model }) {
+async function saveSettings({ apiKey = DEFAULTS.apiKey, model = DEFAULTS.model } = {}) {
   await storageSet({ apiKey, model });
 }
 
@@ -29,7 +41,7 @@ async function addDecision(decision) {
   const data = await storageGet(['decisions']);
   const decisions = data.decisions ?? [];
   decisions.push(decision);
-  await storageSet({ decisions });
+  await storageSet({ decisions: decisions.slice(-DECISIONS_CAP) }); // keep last 100
 }
 
 async function getDecisions() {

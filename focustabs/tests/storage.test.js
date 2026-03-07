@@ -63,4 +63,31 @@ describe('storage', () => {
     expect(saved.archive).toHaveLength(1);
     expect(saved.archive[0].url).toBe('y.com');
   });
+
+  test('getSettings returns stored values when present', async () => {
+    chrome.storage.local.get.mockImplementation((keys, cb) =>
+      cb({ apiKey: 'sk-live', model: 'claude-3-5-sonnet' })
+    );
+    const settings = await getSettings();
+    expect(settings.apiKey).toBe('sk-live');
+    expect(settings.model).toBe('claude-3-5-sonnet');
+  });
+
+  test('getArchive returns empty array when storage is empty', async () => {
+    chrome.storage.local.get.mockImplementation((keys, cb) => cb({}));
+    const archive = await getArchive();
+    expect(archive).toEqual([]);
+  });
+
+  test('addDecision caps stored decisions at 100', async () => {
+    const existing = Array.from({ length: 100 }, (_, i) => ({ tabUrl: `${i}.com`, timestamp: i }));
+    chrome.storage.local.get.mockImplementation((keys, cb) => cb({ decisions: existing }));
+    let saved;
+    chrome.storage.local.set.mockImplementation((obj, cb) => { saved = obj; cb && cb(); });
+
+    await addDecision({ tabUrl: 'new.com', timestamp: 100, action: 'close', activeUrl: '', activeTitle: '', tabTitle: '', userOverrode: false });
+
+    expect(saved.decisions).toHaveLength(100); // still 100, oldest dropped
+    expect(saved.decisions[99].tabUrl).toBe('new.com'); // new one is last
+  });
 });
