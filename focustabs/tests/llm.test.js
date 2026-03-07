@@ -85,3 +85,101 @@ describe('callLLM', () => {
     ).rejects.toThrow(/unsupported model/i);
   });
 });
+
+// ── Additional parseLLMResponse tests ────────────────────────────────────────
+
+describe('parseLLMResponse - additional', () => {
+  test('returns empty array for empty JSON array', () => {
+    const result = parseLLMResponse('[]');
+    expect(result).toEqual([]);
+  });
+
+  test('throws when item index is not a number', () => {
+    const raw = '[{"index":"0","relevant":false,"reason":"x"}]';
+    expect(() => parseLLMResponse(raw)).toThrow(/index.*number/i);
+  });
+
+  test('throws when item relevant is not a boolean', () => {
+    const raw = '[{"index":0,"relevant":"yes","reason":"x"}]';
+    expect(() => parseLLMResponse(raw)).toThrow(/relevant.*boolean/i);
+  });
+});
+
+// ── Anthropic provider tests ──────────────────────────────────────────────────
+
+describe('callLLM - Anthropic', () => {
+  beforeEach(() => {
+    global.fetch = jest.fn();
+  });
+
+  test('calls Anthropic endpoint for claude-3-5-sonnet', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: [{ text: '[{"index":0,"relevant":true,"reason":"relevant"}]' }],
+      }),
+    });
+
+    const result = await callLLM({
+      model: 'claude-3-5-sonnet',
+      apiKey: 'sk-ant-test',
+      systemMessage: 'sys',
+      userMessage: 'user',
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.anthropic.com/v1/messages',
+      expect.objectContaining({ method: 'POST' })
+    );
+    // Verify the versioned model ID is used in the request body
+    const body = JSON.parse(global.fetch.mock.calls[0][1].body);
+    expect(body.model).toBe('claude-3-5-sonnet-20241022');
+    expect(result).toHaveLength(1);
+    expect(result[0].relevant).toBe(true);
+  });
+
+  test('throws on Anthropic non-ok response', async () => {
+    global.fetch.mockResolvedValue({ ok: false, status: 429, text: async () => 'Rate limited' });
+    await expect(
+      callLLM({ model: 'claude-3-5-sonnet', apiKey: 'key', systemMessage: 's', userMessage: 'u' })
+    ).rejects.toThrow('429');
+  });
+});
+
+// ── Gemini provider tests ─────────────────────────────────────────────────────
+
+describe('callLLM - Gemini', () => {
+  beforeEach(() => {
+    global.fetch = jest.fn();
+  });
+
+  test('calls Gemini endpoint for gemini-pro', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: '[{"index":0,"relevant":false,"reason":"off-topic"}]' }] } }],
+      }),
+    });
+
+    const result = await callLLM({
+      model: 'gemini-pro',
+      apiKey: 'AIza-test',
+      systemMessage: 'sys',
+      userMessage: 'user',
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('generativelanguage.googleapis.com'),
+      expect.objectContaining({ method: 'POST' })
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0].relevant).toBe(false);
+  });
+
+  test('throws on Gemini non-ok response', async () => {
+    global.fetch.mockResolvedValue({ ok: false, status: 403, text: async () => 'Forbidden' });
+    await expect(
+      callLLM({ model: 'gemini-pro', apiKey: 'key', systemMessage: 's', userMessage: 'u' })
+    ).rejects.toThrow('403');
+  });
+});
