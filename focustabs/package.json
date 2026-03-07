@@ -1,0 +1,11 @@
+{
+  "name": "focustabs-tests",
+  "private": true,
+  "scripts": {
+    "test": "jest --passWithNoTests"
+  },
+  "devDependencies": {
+    "jest": "^27.0.0",
+    "jest-chrome": "^0.8.0"
+  }
+}

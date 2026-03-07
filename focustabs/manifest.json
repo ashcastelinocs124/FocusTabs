@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "FocusTabs",
+  "version": "1.0.0",
+  "description": "Smart tab cleanup powered by AI — close what doesn't matter, keep your focus.",
+  "permissions": [
+    "tabs",
+    "scripting",
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "FocusTabs"
+  },
+  "options_page": "settings/settings.html",
+  "content_scripts": [],
+  "icons": {}
+}
