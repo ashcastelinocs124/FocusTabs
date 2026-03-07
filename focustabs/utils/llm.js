@@ -1,13 +1,14 @@
 // llm.js — LLM API client supporting OpenAI, Anthropic, and Gemini
 
 const ENDPOINTS = {
-  'gpt-5': 'https://api.openai.com/v1/chat/completions',
-  'gpt-5-mini': 'https://api.openai.com/v1/chat/completions',
+  'gpt-5': 'https://api.openai.com/v1/responses',
+  'gpt-5-mini': 'https://api.openai.com/v1/responses',
   'gpt-4o': 'https://api.openai.com/v1/chat/completions',
   'gpt-4o-mini': 'https://api.openai.com/v1/chat/completions',
   'claude-3-5-sonnet': 'https://api.anthropic.com/v1/messages',
   'gemini-pro': 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
 };
+const OPENAI_CHAT_COMPLETIONS_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 
 // Maps short model keys to the full versioned model IDs required by each API
 const ANTHROPIC_MODEL_IDS = {
@@ -41,21 +42,78 @@ function parseLLMResponse(raw) {
 }
 
 async function callOpenAI({ apiKey, model, systemMessage, userMessage }) {
-  const response = await fetch(ENDPOINTS[model], {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: systemMessage },
-        { role: 'user', content: userMessage },
-      ],
-      temperature: 0.2,
-    }),
+  if (!ENDPOINTS[model]) throw new Error(`Unsupported model: ${model}`);
+  const isResponsesModel = model === 'gpt-5' || model === 'gpt-5-mini';
+  const responsesBody = {
+    model,
+    instructions: systemMessage,
+    input: userMessage,
+  };
+  const chatBody = {
+    model,
+    messages: [
+      { role: 'system', content: systemMessage },
+      { role: 'user', content: userMessage },
+    ],
+    temperature: 0.2,
+  };
+  const requestBody = isResponsesModel
+    ? responsesBody
+    : chatBody;
+  let endpointUsed = ENDPOINTS[model];
+  const parseAsResponses = () => endpointUsed.includes('/responses');
+
+  const buildHeaders = () => ({
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${apiKey}`,
   });
+
+  let response;
+  try {
+    response = await fetch(endpointUsed, {
+      method: 'POST',
+      headers: buildHeaders(),
+      body: JSON.stringify(requestBody),
+    });
+  } catch (err) {
+    if (!isResponsesModel) {
+      throw new Error(`OpenAI network error (${model}): ${err?.message || String(err)}`);
+    }
+    // Some environments intermittently fail on /responses. Fall back to chat/completions.
+    endpointUsed = OPENAI_CHAT_COMPLETIONS_ENDPOINT;
+    try {
+      response = await fetch(endpointUsed, {
+        method: 'POST',
+        headers: buildHeaders(),
+        body: JSON.stringify(chatBody),
+      });
+    } catch (fallbackErr) {
+      throw new Error(
+        `OpenAI network error (${model}) responses+chat failed: ${err?.message || String(err)} | ${
+          fallbackErr?.message || String(fallbackErr)
+        }`
+      );
+    }
+  }
+
+  if (!response.ok && isResponsesModel) {
+    const firstStatus = response.status;
+    const firstBody = await response.text();
+    endpointUsed = OPENAI_CHAT_COMPLETIONS_ENDPOINT;
+    try {
+      response = await fetch(endpointUsed, {
+        method: 'POST',
+        headers: buildHeaders(),
+        body: JSON.stringify(chatBody),
+      });
+    } catch (fallbackErr) {
+      throw new Error(
+        `OpenAI ${model} responses failed (${firstStatus}): ${firstBody}. Chat fallback network error: ${
+          fallbackErr?.message || String(fallbackErr)
+        }`
+      );
+    }
+  }
 
   if (!response.ok) {
     const text = await response.text();
@@ -63,12 +121,16 @@ async function callOpenAI({ apiKey, model, systemMessage, userMessage }) {
   }
 
   const data = await response.json();
-  const content = data?.choices?.[0]?.message?.content;
+  const content = parseAsResponses()
+    ? (data?.output_text ||
+      data?.output?.map((item) => item?.content?.map((c) => c?.text).filter(Boolean).join('\n')).filter(Boolean).join('\n'))
+    : data?.choices?.[0]?.message?.content;
   if (!content) throw new Error(`OpenAI returned an unexpected response shape: ${JSON.stringify(data)}`);
   return parseLLMResponse(content);
 }
 
 async function callAnthropic({ apiKey, model, systemMessage, userMessage }) {
+  if (!ENDPOINTS[model]) throw new Error(`Unsupported model: ${model}`);
   const anthropicModel = ANTHROPIC_MODEL_IDS[model] ?? model;
 
   const response = await fetch(ENDPOINTS[model], {
@@ -98,6 +160,7 @@ async function callAnthropic({ apiKey, model, systemMessage, userMessage }) {
 }
 
 async function callGemini({ apiKey, model, systemMessage, userMessage }) {
+  if (!ENDPOINTS[model]) throw new Error(`Unsupported model: ${model}`);
   // Gemini REST API uses API key as a query parameter (documented method for API key auth).
   // OAuth Bearer tokens are used for user-based auth, not API key auth.
   const url = `${ENDPOINTS[model]}?key=${apiKey}`;

@@ -55,6 +55,67 @@ describe('callLLM', () => {
     expect(result[0].relevant).toBe(false);
   });
 
+  test('calls OpenAI Responses endpoint for gpt-5', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        output_text: '[{"index":0,"relevant":false,"reason":"x"}]',
+      }),
+    });
+
+    const result = await callLLM({ model: 'gpt-5', apiKey: 'sk-test', systemMessage: 'sys', userMessage: 'user' });
+
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.openai.com/v1/responses',
+      expect.objectContaining({ method: 'POST' })
+    );
+    const body = JSON.parse(global.fetch.mock.calls[0][1].body);
+    expect(body.instructions).toBe('sys');
+    expect(body.input).toBe('user');
+    expect(result).toHaveLength(1);
+  });
+
+  test('falls back to chat completions when gpt-5 responses fetch fails', async () => {
+    global.fetch
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: '[{"index":0,"relevant":false,"reason":"x"}]' } }],
+        }),
+      });
+
+    const result = await callLLM({ model: 'gpt-5', apiKey: 'sk-test', systemMessage: 'sys', userMessage: 'user' });
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      1,
+      'https://api.openai.com/v1/responses',
+      expect.anything()
+    );
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      2,
+      'https://api.openai.com/v1/chat/completions',
+      expect.anything()
+    );
+    expect(result).toHaveLength(1);
+  });
+
+  test('parses gpt-5 text from output array when output_text is missing', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        output: [
+          {
+            content: [{ text: '[{"index":0,"relevant":true,"reason":"docs"}]' }],
+          },
+        ],
+      }),
+    });
+
+    const result = await callLLM({ model: 'gpt-5', apiKey: 'sk-test', systemMessage: 'sys', userMessage: 'user' });
+    expect(result).toHaveLength(1);
+    expect(result[0].relevant).toBe(true);
+  });
+
   test('calls OpenAI endpoint for gpt-4o-mini', async () => {
     global.fetch.mockResolvedValue({
       ok: true,

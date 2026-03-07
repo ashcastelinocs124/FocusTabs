@@ -1,8 +1,10 @@
 // popup.js — FocusTabs popup controller
 
 const $ = (sel) => document.querySelector(sel);
+const ANALYZE_TAB_THRESHOLD = 10;
 
 let currentSuggestions = [];
+let chatHistory = [];
 
 // ─── Tab navigation ───────────────────────────────────────────────────────────
 
@@ -29,9 +31,11 @@ async function initIdle() {
   try {
     const tabs = await chrome.tabs.query({ currentWindow: true });
     const activeTab = tabs.find((t) => t.active);
+    updateAnalyzeGate(tabs.length);
     $("#tab-count").textContent = `${tabs.length} tab${tabs.length !== 1 ? "s" : ""} open`;
     $("#focus-title").textContent = truncate(activeTab?.title ?? "Unknown", 40);
   } catch (err) {
+    updateAnalyzeGate(0);
     $("#tab-count").textContent = "Unable to count tabs";
   }
 }
@@ -40,16 +44,115 @@ async function initIdle() {
 
 $("#analyze-btn").addEventListener("click", runAnalysis);
 $("#retry-btn").addEventListener("click", runAnalysis);
+$("#chat-send-btn").addEventListener("click", runChat);
 
 async function runAnalysis() {
+  if ($("#analyze-btn").disabled) return;
   showState("loading");
   try {
-    const result = await sendMessage({ type: "ANALYZE" });
+    const settings = await getFrontendSettings();
+    const result = await sendMessage({ type: "ANALYZE", ...settings });
     if (result.error) throw new Error(result.error);
     currentSuggestions = result.suggestions ?? [];
     renderResults(currentSuggestions, result.focusTab);
   } catch (err) {
     showError(err.message);
+  }
+}
+
+async function runChat() {
+  resetChatHistoryIfNeeded();
+  const query = $("#chat-query").value.trim();
+  if (!query) {
+    showChatError("Enter a question to analyze your open tabs.");
+    return;
+  }
+
+  hideChatMessages();
+  const btn = $("#chat-send-btn");
+  btn.disabled = true;
+  btn.textContent = "Asking...";
+  appendChatMessage("user", query);
+  chatHistory.push({ role: "user", text: query });
+  $("#chat-query").value = "";
+  const pendingNode = appendChatMessage("assistant", "Analyzing open tabs...");
+
+  try {
+    const settings = await getFrontendSettings();
+    const result = await sendMessage({ type: "CHAT_TABS", query, history: chatHistory, ...settings });
+    if (result.error) throw new Error(result.error);
+    const answer = result.answer ?? "";
+    updateAssistantMessage(pendingNode, answer, result.relevantTabs ?? []);
+    chatHistory.push({ role: "assistant", text: answer });
+  } catch (err) {
+    const errorReply = `I couldn't complete that request: ${err.message}`;
+    updateAssistantMessage(pendingNode, errorReply, []);
+    chatHistory.push({ role: "assistant", text: errorReply });
+    showChatError(err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Ask All Tabs";
+  }
+}
+
+function updateAnalyzeGate(tabCount) {
+  const analyzeBtn = $("#analyze-btn");
+  const gateMsg = $("#analyze-gate-msg");
+  const overThreshold = tabCount > ANALYZE_TAB_THRESHOLD;
+  analyzeBtn.disabled = !overThreshold;
+
+  if (overThreshold) {
+    gateMsg.textContent = `You have ${tabCount} tabs open. Ready to analyze and clean up?`;
+    return;
+  }
+
+  const needed = ANALYZE_TAB_THRESHOLD + 1 - tabCount;
+  gateMsg.textContent = `Open ${needed} more tab${needed === 1 ? "" : "s"} to unlock analysis (starts at 11+ tabs).`;
+}
+
+function appendChatMessage(role, text) {
+  const thread = $("#chat-thread");
+  const item = document.createElement("div");
+  item.className = `chat-msg ${role}`;
+  item.textContent = text;
+  thread.appendChild(item);
+  thread.scrollTop = thread.scrollHeight;
+  return item;
+}
+
+function updateAssistantMessage(node, answer, relevantTabs) {
+  node.textContent = answer || "No response returned.";
+  if (relevantTabs.length > 0) {
+    const list = document.createElement("ul");
+    list.className = "chat-tabs-list";
+    relevantTabs.forEach((tab) => {
+      const li = document.createElement("li");
+      li.className = "chat-tab-item";
+      li.innerHTML = `
+        <div>${escapeHtml(truncate(tab.title || tab.url || "Untitled tab", 60))}</div>
+        <div class="chat-tab-url">${escapeHtml(tab.url || "")}</div>
+      `;
+      list.appendChild(li);
+    });
+    node.appendChild(list);
+  }
+  const thread = $("#chat-thread");
+  thread.scrollTop = thread.scrollHeight;
+}
+
+function showChatError(msg) {
+  const el = $("#chat-error-msg");
+  el.textContent = msg;
+  el.classList.remove("hidden");
+}
+
+function hideChatMessages() {
+  $("#chat-error-msg").classList.add("hidden");
+}
+
+function resetChatHistoryIfNeeded() {
+  if (chatHistory.length > 20) {
+    chatHistory = chatHistory.slice(-20);
   }
 }
 
@@ -180,6 +283,21 @@ function sendMessage(msg) {
   });
 }
 
+function getFrontendSettings() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(["apiKey", "model"], (data) => {
+      if (chrome.runtime.lastError) {
+        resolve({});
+        return;
+      }
+      resolve({
+        apiKey: data.apiKey ?? "",
+        model: data.model ?? "gpt-5-mini",
+      });
+    });
+  });
+}
+
 function truncate(str, max) {
   if (!str) return "";
   return str.length <= max ? str : str.slice(0, max) + "\u2026";
@@ -218,5 +336,12 @@ $("#archive-list").addEventListener("click", async (e) => {
 
 // Register suggestions change listener once
 $("#suggestions-list").addEventListener("change", updateCloseCount);
+$("#chat-query").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    resetChatHistoryIfNeeded();
+    runChat();
+  }
+});
 
 initIdle();

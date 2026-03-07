@@ -9,15 +9,15 @@ describe('storage', () => {
 
   test('getSettings returns defaults when storage is empty', async () => {
     const settings = await getSettings();
-    expect(settings.model).toBe('gpt-4o');
+    expect(settings.model).toBe('gpt-5-mini');
     expect(settings.apiKey).toBe('');
   });
 
   test('saveSettings writes to storage', async () => {
     chrome.storage.local.set.mockImplementation((obj, cb) => { cb && cb(); });
-    await saveSettings({ apiKey: 'sk-test', model: 'claude-3-5-sonnet' });
+    await saveSettings({ apiKey: 'sk-ant-test', model: 'claude-3-5-sonnet' });
     expect(chrome.storage.local.set).toHaveBeenCalledWith(
-      expect.objectContaining({ apiKey: 'sk-test', model: 'claude-3-5-sonnet' }),
+      expect.objectContaining({ apiKey: 'sk-ant-test', model: 'claude-3-5-sonnet' }),
       expect.any(Function)
     );
   });
@@ -66,10 +66,19 @@ describe('storage', () => {
 
   test('getSettings returns stored values when present', async () => {
     chrome.storage.local.get.mockImplementation((keys, cb) =>
-      cb({ apiKey: 'sk-live', model: 'claude-3-5-sonnet' })
+      cb({ apiKey: 'sk-ant-live', model: 'claude-3-5-sonnet' })
     );
     const settings = await getSettings();
-    expect(settings.apiKey).toBe('sk-live');
+    expect(settings.apiKey).toBe('sk-ant-live');
+    expect(settings.model).toBe('claude-3-5-sonnet');
+  });
+
+  test('normalizes model when API key provider and model provider do not match', async () => {
+    chrome.storage.local.get.mockImplementation((keys, cb) =>
+      cb({ apiKey: 'sk-ant-live', model: 'gpt-5' })
+    );
+    const settings = await getSettings();
+    expect(settings.apiKey).toBe('sk-ant-live');
     expect(settings.model).toBe('claude-3-5-sonnet');
   });
 

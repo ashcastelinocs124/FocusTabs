@@ -6,27 +6,40 @@
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
-  <header>
-    <span class="logo">FocusTabs</span>
-    <div class="tabs-nav">
-      <button class="tab-btn active" data-tab="analyze">Analyze</button>
-      <button class="tab-btn" data-tab="archive">Archive</button>
+
+  <header class="popup-header">
+    <div class="header-row">
+      <div class="logo-area">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+        </svg>
+        <span class="logo">FocusTabs</span>
+      </div>
+      <button class="settings-btn" id="settings-btn" title="Settings">&#9881;</button>
     </div>
-    <button class="settings-btn" id="settings-btn" title="Settings">&#9881;</button>
   </header>
+
+  <nav class="tabs-nav">
+    <button class="tab-btn active" data-tab="analyze">Analyze</button>
+    <button class="tab-btn" data-tab="chat">Chat</button>
+    <button class="tab-btn" data-tab="archive">Archive</button>
+  </nav>
 
   <!-- Analyze panel -->
   <div id="panel-analyze" class="panel">
     <!-- Idle state -->
     <div id="state-idle">
-      <p class="tab-count" id="tab-count">Loading...</p>
-      <p class="focus-label">Focus: <span id="focus-title">&mdash;</span></p>
+      <div class="idle-info-card">
+        <p class="tab-count" id="tab-count">Loading...</p>
+        <p class="focus-label">Focus: <span id="focus-title">&mdash;</span></p>
+      </div>
+      <p class="analyze-gate-msg" id="analyze-gate-msg"></p>
       <button class="primary-btn" id="analyze-btn">Analyze My Tabs</button>
     </div>
 
     <!-- Loading state -->
     <div id="state-loading" class="hidden">
-      <p class="loading-msg">Analyzing your tabs...</p>
+      <p class="loading-msg">Analyzing your tabs&hellip;</p>
       <div class="spinner"></div>
     </div>
 
@@ -44,6 +57,23 @@
         <button class="primary-btn" id="archive-btn">Archive &amp; Close (<span id="close-count">0</span>)</button>
         <button class="secondary-btn" id="cancel-btn">Cancel</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Chat panel -->
+  <div id="panel-chat" class="panel hidden">
+    <p class="chat-label">Ask FocusTabs which open tabs matter for your current task.</p>
+    <textarea
+      id="chat-query"
+      class="chat-query"
+      placeholder="Example: Which tabs are relevant to preparing my sprint planning doc?"
+    ></textarea>
+    <button class="primary-btn" id="chat-send-btn">Ask All Tabs</button>
+    <p class="error-msg hidden" id="chat-error-msg"></p>
+    <div class="chat-result hidden" id="chat-result">
+      <p class="chat-answer" id="chat-answer"></p>
+      <p class="chat-subheader">Most relevant open tabs:</p>
+      <ul class="chat-tabs-list" id="chat-tabs-list"></ul>
     </div>
   </div>
 
