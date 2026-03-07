@@ -25,7 +25,66 @@ If you implement a backend endpoint without surfacing it in the UI, the feature 
 
 ## Execution Workflow
 
-### Phase 0: Architecture Context (if applicable)
+### Phase 0: Context Questions (BLOCKING — AskUserQuestion BEFORE anything else)
+
+**Run this BEFORE exploring code, BEFORE planning, BEFORE writing a single line.**
+
+Ask up to 3 questions in one `AskUserQuestion` call. Tailor them to what's actually unclear — don't ask what the user already told you.
+
+**Always ask Q1. Ask Q2 and Q3 only if genuinely unclear:**
+
+**Q1 — Confirm scope** (always ask):
+```
+question: "What should this do when it's done? Describe the end state."
+header: "What to build"
+options:
+  - label: "[Restate user's request as option A — most likely interpretation]"
+    description: "Build exactly this"
+  - label: "[Narrower version — just the core, no extras]"
+    description: "Minimal version only"
+  - label: "[Broader version — if it likely needs more than stated]"
+    description: "Include [X] as well"
+```
+
+**Q2 — Stack scope** (ask if not obvious):
+```
+question: "What scope does this touch?"
+header: "Scope"
+options:
+  - label: "Full-stack (backend + frontend)"
+    description: "Build the API and wire it into the UI"
+  - label: "Backend only"
+    description: "API / service / data layer — no UI changes"
+  - label: "Frontend only"
+    description: "UI changes only — backend already exists"
+  - label: "Other"
+    description: "I'll describe it"
+```
+
+**Q3 — Hard constraints** (ask if the task has real choices):
+```
+question: "Any constraints I should know before I start?"
+header: "Constraints"
+options:
+  - label: "No constraints — use your best judgement"
+    description: "Pick the simplest, most fitting approach"
+  - label: "Must use [specific library/pattern]"
+    description: "I'll specify in Other"
+  - label: "Must NOT change [specific file/system]"
+    description: "I'll specify in Other"
+  - label: "Match existing pattern in codebase"
+    description: "Find what's already there and follow it exactly"
+```
+
+**Rules:**
+- Do NOT start exploring the codebase until all questions are answered
+- Do NOT ask questions already answered in the user's original message
+- If the task is a one-liner with zero ambiguity (e.g. "add a print statement"), skip this phase
+- Batch all questions into a single `AskUserQuestion` call — no back-and-forth
+
+---
+
+### Phase 0.5: Architecture Context (if applicable)
 
 **When invoked from /system-arch or when architecture context exists:**
 - Review the approved architecture decision
@@ -151,15 +210,28 @@ Only start coding after the plan is written. Keep the plan updated if scope chan
 - Every new function/module MUST have corresponding tests
 - Aim for >80% code coverage on new code
 
-### Phase 2.5: Approval Gate (for complex changes)
+### Phase 2.5: Plan Approval Gate (BLOCKING — AskUserQuestion)
 
-**For multi-file changes, architectural decisions, or ambiguous requirements:**
-1. Present the plan to the user
-2. Highlight any assumptions or open questions
-3. Wait for explicit approval or feedback
-4. If changes requested, update plan and re-present
+**Always run this after writing the plan. No exceptions.**
 
-**Skip this gate for:** Small, well-defined tasks where the path is clear.
+Show the plan summary, then use `AskUserQuestion`:
+
+```
+question: "Here's the plan — does this look right before I start coding?"
+header: "Approve plan"
+options:
+  - label: "Yes, proceed"
+    description: "Start implementing as planned"
+  - label: "Change the scope"
+    description: "I'll tell you what to adjust — you update the plan before starting"
+  - label: "Wrong approach — let's rethink"
+    description: "I'll describe what I want instead"
+```
+
+- If "Change the scope" or "Wrong approach": incorporate feedback, show updated plan, re-ask
+- If "Yes, proceed": begin Phase 3
+
+**Do NOT write a single line of implementation code until the user approves the plan.**
 
 ### Phase 3: Implement
 - Follow the plan steps in order; keep changes minimal and focused
