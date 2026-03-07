@@ -35,6 +35,26 @@
       </div>
       <p class="analyze-gate-msg" id="analyze-gate-msg"></p>
       <button class="primary-btn" id="analyze-btn">Analyze My Tabs</button>
+      <div class="workflow-picker hidden" id="workflow-picker">
+        <p class="workflow-picker-title">I think your current workflow is:</p>
+        <p class="workflow-picker-subtitle">Pick one before analysis.</p>
+        <ul class="workflow-options" id="workflow-options"></ul>
+        <label class="workflow-option workflow-option-custom">
+          <input type="radio" name="workflow-option" value="custom" id="workflow-option-custom" />
+          <span>4. Other (type it out)</span>
+        </label>
+        <input
+          type="text"
+          id="workflow-custom-input"
+          class="workflow-custom-input"
+          placeholder="Type your current workflow"
+        />
+        <p class="workflow-picker-error hidden" id="workflow-picker-error"></p>
+        <div class="workflow-picker-actions">
+          <button class="primary-btn" id="workflow-confirm-btn">Analyze Selected Workflow</button>
+          <button class="secondary-btn" id="workflow-cancel-btn">Cancel</button>
+        </div>
+      </div>
     </div>
 
     <!-- Loading state -->
@@ -52,6 +72,11 @@
     <!-- Results state -->
     <div id="state-results" class="hidden">
       <p class="results-header" id="results-header"></p>
+      <div class="workflow-insights hidden" id="workflow-insights">
+        <p class="workflow-current" id="workflow-current"></p>
+        <ul class="workflow-hypotheses" id="workflow-hypotheses"></ul>
+        <p class="workflow-optimization" id="workflow-optimization"></p>
+      </div>
       <ul class="suggestions-list" id="suggestions-list"></ul>
       <div class="results-actions">
         <button class="primary-btn" id="archive-btn">Archive &amp; Close (<span id="close-count">0</span>)</button>

@@ -134,6 +134,94 @@ body {
   line-height: 1.5;
 }
 
+.workflow-picker {
+  margin-top: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.workflow-picker-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.workflow-picker-subtitle {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+.workflow-options {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.workflow-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text);
+}
+
+.workflow-option input[type=radio] {
+  margin-top: 2px;
+}
+
+.workflow-option-title {
+  font-weight: 600;
+}
+
+.workflow-option-url {
+  color: var(--muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workflow-option-meta {
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+.workflow-custom-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text);
+  font-family: inherit;
+  margin-bottom: 8px;
+}
+
+.workflow-custom-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+}
+
+.workflow-picker-error {
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: var(--error);
+}
+
+.workflow-picker-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 /* ─── Loading State ──────────────────────────────────────────────────── */
 #state-loading {
   text-align: center;
@@ -224,6 +312,47 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin-bottom: 8px;
+}
+
+.workflow-insights {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  box-shadow: var(--shadow-sm);
+}
+
+.workflow-current {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.workflow-hypotheses {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.workflow-hypothesis {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.workflow-hypothesis strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.workflow-optimization {
+  font-size: 11px;
+  color: var(--text);
+  line-height: 1.4;
 }
 
 .suggestions-list {

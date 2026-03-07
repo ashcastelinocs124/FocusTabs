@@ -1,10 +1,12 @@
 // popup.js — FocusTabs popup controller
 
 const $ = (sel) => document.querySelector(sel);
-const ANALYZE_TAB_THRESHOLD = 10;
+const ANALYZE_TAB_THRESHOLD = 5;
+const WORKFLOW_RECENT_OPTION_COUNT = 3;
 
 let currentSuggestions = [];
 let chatHistory = [];
+let workflowOptions = [];
 
 // ─── Tab navigation ───────────────────────────────────────────────────────────
 
@@ -28,6 +30,7 @@ $("#settings-btn").addEventListener("click", () => {
 
 async function initIdle() {
   showState("idle");
+  hideWorkflowPicker();
   try {
     const tabs = await chrome.tabs.query({ currentWindow: true });
     const activeTab = tabs.find((t) => t.active);
@@ -42,22 +45,126 @@ async function initIdle() {
 
 // ─── Analysis ────────────────────────────────────────────────────────────────
 
-$("#analyze-btn").addEventListener("click", runAnalysis);
-$("#retry-btn").addEventListener("click", runAnalysis);
+$("#analyze-btn").addEventListener("click", startWorkflowSelection);
+$("#retry-btn").addEventListener("click", startWorkflowSelection);
 $("#chat-send-btn").addEventListener("click", runChat);
+$("#workflow-confirm-btn").addEventListener("click", confirmWorkflowSelection);
+$("#workflow-cancel-btn").addEventListener("click", cancelWorkflowSelection);
+$("#workflow-custom-input").addEventListener("input", () => {
+  if ($("#workflow-custom-input").value.trim()) {
+    $("#workflow-option-custom").checked = true;
+  }
+  hideWorkflowPickerError();
+});
 
-async function runAnalysis() {
+async function startWorkflowSelection() {
   if ($("#analyze-btn").disabled) return;
+  showState("idle");
+  hideWorkflowPickerError();
+  try {
+    const settings = await getFrontendSettings();
+    const response = await sendMessage({ type: "GET_WORKFLOW_RECOMMENDATIONS", ...settings });
+    if (response.error) throw new Error(response.error);
+    const options = Array.isArray(response.workflowOptions) ? response.workflowOptions : [];
+    workflowOptions = options.slice(0, WORKFLOW_RECENT_OPTION_COUNT).map((item, idx) => ({
+      key: String(idx),
+      name: item?.name || `Workflow ${idx + 1}`,
+      confidence: Number(item?.confidence) || 0,
+      evidence: item?.evidence || "Based on your recent tab activity.",
+    }));
+    while (workflowOptions.length < WORKFLOW_RECENT_OPTION_COUNT) {
+      workflowOptions.push({
+        key: String(workflowOptions.length),
+        name: `Workflow ${workflowOptions.length + 1}`,
+        confidence: 0,
+        evidence: "Insufficient context.",
+      });
+    }
+    renderWorkflowOptions(workflowOptions);
+    $("#workflow-picker").classList.remove("hidden");
+    $("#analyze-btn").classList.add("hidden");
+  } catch (err) {
+    showError(err.message || "Unable to load recent tabs.");
+  }
+}
+
+function confirmWorkflowSelection() {
+  const selected = document.querySelector('input[name="workflow-option"]:checked');
+  if (!selected) {
+    showWorkflowPickerError("Pick an option before analyzing.");
+    return;
+  }
+  let selectedWorkflow = "";
+  if (selected.value === "custom") {
+    selectedWorkflow = $("#workflow-custom-input").value.trim();
+    if (!selectedWorkflow) {
+      showWorkflowPickerError("Type your workflow for option 4.");
+      return;
+    }
+  } else {
+    const option = workflowOptions.find((item) => item.key === selected.value);
+    selectedWorkflow = option?.name?.trim() || "";
+  }
+  runAnalysis(selectedWorkflow);
+}
+
+function cancelWorkflowSelection() {
+  hideWorkflowPicker();
+}
+
+async function runAnalysis(selectedWorkflow = "") {
+  hideWorkflowPicker();
   showState("loading");
   try {
     const settings = await getFrontendSettings();
-    const result = await sendMessage({ type: "ANALYZE", ...settings });
+    const result = await sendMessage({ type: "ANALYZE", selectedWorkflow, ...settings });
     if (result.error) throw new Error(result.error);
     currentSuggestions = result.suggestions ?? [];
-    renderResults(currentSuggestions, result.focusTab);
+    renderResults(currentSuggestions, {
+      workflowHypotheses: result.workflowHypotheses ?? [],
+      workflowOptimization: result.workflowOptimization ?? {},
+    });
   } catch (err) {
     showError(err.message);
   }
+}
+
+function renderWorkflowOptions(options = []) {
+  const list = $("#workflow-options");
+  list.innerHTML = "";
+  options.forEach((item, idx) => {
+    const pct = `${Math.round(Math.max(0, Math.min(1, Number(item.confidence) || 0)) * 100)}%`;
+    const li = document.createElement("li");
+    li.innerHTML = `
+      <label class="workflow-option">
+        <input type="radio" name="workflow-option" value="${escapeHtml(item.key)}" ${idx === 0 ? "checked" : ""} />
+        <span>
+          <div class="workflow-option-title">${idx + 1}. ${escapeHtml(truncate(item.name, 56))}</div>
+          <div class="workflow-option-meta">Confidence: ${escapeHtml(pct)}</div>
+          <div class="workflow-option-url">${escapeHtml(item.evidence)}</div>
+        </span>
+      </label>
+    `;
+    list.appendChild(li);
+  });
+  $("#workflow-option-custom").checked = false;
+  $("#workflow-custom-input").value = "";
+}
+
+function showWorkflowPickerError(msg) {
+  const el = $("#workflow-picker-error");
+  el.textContent = msg;
+  el.classList.remove("hidden");
+}
+
+function hideWorkflowPickerError() {
+  $("#workflow-picker-error").classList.add("hidden");
+}
+
+function hideWorkflowPicker() {
+  $("#workflow-picker").classList.add("hidden");
+  $("#analyze-btn").classList.remove("hidden");
+  hideWorkflowPickerError();
 }
 
 async function runChat() {
@@ -98,7 +205,7 @@ async function runChat() {
 function updateAnalyzeGate(tabCount) {
   const analyzeBtn = $("#analyze-btn");
   const gateMsg = $("#analyze-gate-msg");
-  const overThreshold = tabCount > ANALYZE_TAB_THRESHOLD;
+  const overThreshold = tabCount >= ANALYZE_TAB_THRESHOLD;
   analyzeBtn.disabled = !overThreshold;
 
   if (overThreshold) {
@@ -106,8 +213,8 @@ function updateAnalyzeGate(tabCount) {
     return;
   }
 
-  const needed = ANALYZE_TAB_THRESHOLD + 1 - tabCount;
-  gateMsg.textContent = `Open ${needed} more tab${needed === 1 ? "" : "s"} to unlock analysis (starts at 11+ tabs).`;
+  const needed = ANALYZE_TAB_THRESHOLD - tabCount;
+  gateMsg.textContent = `Open ${needed} more tab${needed === 1 ? "" : "s"} to unlock analysis (starts at 5+ tabs).`;
 }
 
 function appendChatMessage(role, text) {
@@ -156,7 +263,9 @@ function resetChatHistoryIfNeeded() {
   }
 }
 
-function renderResults(suggestions) {
+function renderResults(suggestions, workflowAnalysis = {}) {
+  renderWorkflowInsights(workflowAnalysis.workflowHypotheses, workflowAnalysis.workflowOptimization);
+
   if (suggestions.length === 0) {
     $("#results-header").textContent = "All tabs look relevant to your current focus.";
     $("#suggestions-list").innerHTML = "";
@@ -184,6 +293,41 @@ function renderResults(suggestions) {
 
   updateCloseCount();
   showState("results");
+}
+
+function renderWorkflowInsights(hypotheses = [], workflowOptimization = {}) {
+  const wrapper = $("#workflow-insights");
+  const current = $("#workflow-current");
+  const list = $("#workflow-hypotheses");
+  const optimization = $("#workflow-optimization");
+
+  const normalizedHypotheses = hypotheses.slice(0, 3);
+  if (!workflowOptimization?.currentWorkflow && normalizedHypotheses.length === 0) {
+    wrapper.classList.add("hidden");
+    current.textContent = "";
+    list.innerHTML = "";
+    optimization.textContent = "";
+    return;
+  }
+
+  wrapper.classList.remove("hidden");
+  const currentWorkflow = workflowOptimization?.currentWorkflow || "Likely in a mixed context workflow";
+  current.textContent = `Most likely workflow: ${currentWorkflow}`;
+
+  list.innerHTML = "";
+  normalizedHypotheses.forEach((item, idx) => {
+    const li = document.createElement("li");
+    li.className = "workflow-hypothesis";
+    const name = item?.name || `Hypothesis ${idx + 1}`;
+    const confidence = Number(item?.confidence);
+    const pct = Number.isFinite(confidence) ? `${Math.round(Math.max(0, Math.min(1, confidence)) * 100)}%` : "0%";
+    const evidence = item?.evidence || "Insufficient evidence from current history.";
+    li.innerHTML = `<strong>${escapeHtml(name)}</strong> (${pct}) - ${escapeHtml(evidence)}`;
+    list.appendChild(li);
+  });
+
+  optimization.textContent =
+    workflowOptimization?.recommendation || "Optimization: Keep tabs tightly aligned with the top workflow hypothesis.";
 }
 
 function updateCloseCount() {

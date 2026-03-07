@@ -8,34 +8,37 @@ const otherTabs = [
 const decisions = [
   { action: 'keep', tabTitle: 'MDN docs', activeTitle: 'GitHub PR', tabUrl: 'mdn.com' },
 ];
+const recentHistory = [
+  { when: '2m ago', title: 'Jira Sprint Board', url: 'https://jira.example.com/sprint' },
+];
 
 describe('buildPrompt', () => {
   test('includes active tab title and url in userMessage', () => {
-    const { userMessage } = buildPrompt(activeTab, otherTabs, decisions);
+    const { userMessage } = buildPrompt(activeTab, otherTabs, decisions, '', recentHistory);
     expect(userMessage).toContain('GitHub PR #42');
     expect(userMessage).toContain('https://github.com/org/repo/pull/42');
   });
 
   test('includes all other tab titles in userMessage', () => {
-    const { userMessage } = buildPrompt(activeTab, otherTabs, decisions);
+    const { userMessage } = buildPrompt(activeTab, otherTabs, decisions, '', recentHistory);
     expect(userMessage).toContain('Amazon - Shoes');
     expect(userMessage).toContain('MDN - Array');
   });
 
   test('includes past decisions in userMessage', () => {
-    const { userMessage } = buildPrompt(activeTab, otherTabs, decisions);
+    const { userMessage } = buildPrompt(activeTab, otherTabs, decisions, '', recentHistory);
     expect(userMessage).toContain('kept');
     expect(userMessage).toContain('MDN docs');
   });
 
   test('systemMessage instructs JSON-only response', () => {
-    const { systemMessage } = buildPrompt(activeTab, otherTabs, decisions);
+    const { systemMessage } = buildPrompt(activeTab, otherTabs, decisions, '', recentHistory);
     expect(systemMessage).toContain('JSON');
     expect(systemMessage.toLowerCase()).toContain('focus');
   });
 
   test('returns object with both systemMessage and userMessage', () => {
-    const result = buildPrompt(activeTab, otherTabs, decisions);
+    const result = buildPrompt(activeTab, otherTabs, decisions, '', recentHistory);
     expect(result).toHaveProperty('systemMessage');
     expect(result).toHaveProperty('userMessage');
     expect(typeof result.systemMessage).toBe('string');
@@ -43,18 +46,18 @@ describe('buildPrompt', () => {
   });
 
   test('handles empty decisions gracefully', () => {
-    const { userMessage } = buildPrompt(activeTab, otherTabs, []);
+    const { userMessage } = buildPrompt(activeTab, otherTabs, [], '', recentHistory);
     expect(userMessage).toContain('none yet');
   });
 
   test('handles empty otherTabs gracefully', () => {
-    const { userMessage } = buildPrompt(activeTab, [], decisions);
+    const { userMessage } = buildPrompt(activeTab, [], decisions, '', recentHistory);
     expect(userMessage).toContain('(none)');
     expect(userMessage).toContain('GitHub PR #42'); // active tab still present
   });
 
   test('includes tab index brackets in the tab list', () => {
-    const { userMessage } = buildPrompt(activeTab, otherTabs, decisions);
+    const { userMessage } = buildPrompt(activeTab, otherTabs, decisions, '', recentHistory);
     expect(userMessage).toContain('[0]');
     expect(userMessage).toContain('[1]');
   });
@@ -63,7 +66,9 @@ describe('buildPrompt', () => {
     const { userMessage } = buildPrompt(
       { title: null, url: undefined, summary: null },
       [{ index: 0, title: undefined, url: null, summary: undefined }],
-      []
+      [],
+      '',
+      recentHistory
     );
     // Should not contain the string "null" or "undefined"
     expect(userMessage).not.toContain('"null"');
@@ -71,10 +76,17 @@ describe('buildPrompt', () => {
   });
 
   test('URL is quoted consistently in the prompt', () => {
-    const { userMessage } = buildPrompt(activeTab, otherTabs, decisions);
+    const { userMessage } = buildPrompt(activeTab, otherTabs, decisions, '', recentHistory);
     // Active tab URL should be quoted
     expect(userMessage).toContain('"https://github.com/org/repo/pull/42"');
     // Other tab URLs should be quoted
     expect(userMessage).toContain('"https://amazon.com/shoes"');
+  });
+
+  test('includes recent tab history context with timestamps', () => {
+    const { userMessage } = buildPrompt(activeTab, otherTabs, decisions, '', recentHistory);
+    expect(userMessage).toContain('Recent tab history');
+    expect(userMessage).toContain('[2m ago]');
+    expect(userMessage).toContain('Jira Sprint Board');
   });
 });
