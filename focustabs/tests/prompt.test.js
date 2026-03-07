@@ -49,7 +49,32 @@ describe('buildPrompt', () => {
 
   test('handles empty otherTabs gracefully', () => {
     const { userMessage } = buildPrompt(activeTab, [], decisions);
-    expect(userMessage).toBeDefined();
+    expect(userMessage).toContain('(none)');
     expect(userMessage).toContain('GitHub PR #42'); // active tab still present
+  });
+
+  test('includes tab index brackets in the tab list', () => {
+    const { userMessage } = buildPrompt(activeTab, otherTabs, decisions);
+    expect(userMessage).toContain('[0]');
+    expect(userMessage).toContain('[1]');
+  });
+
+  test('sanitizes null/undefined tab fields to empty string', () => {
+    const { userMessage } = buildPrompt(
+      { title: null, url: undefined, summary: null },
+      [{ index: 0, title: undefined, url: null, summary: undefined }],
+      []
+    );
+    // Should not contain the string "null" or "undefined"
+    expect(userMessage).not.toContain('"null"');
+    expect(userMessage).not.toContain('"undefined"');
+  });
+
+  test('URL is quoted consistently in the prompt', () => {
+    const { userMessage } = buildPrompt(activeTab, otherTabs, decisions);
+    // Active tab URL should be quoted
+    expect(userMessage).toContain('"https://github.com/org/repo/pull/42"');
+    // Other tab URLs should be quoted
+    expect(userMessage).toContain('"https://amazon.com/shoes"');
   });
 });
