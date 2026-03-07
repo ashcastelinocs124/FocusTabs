@@ -6,8 +6,7 @@
   "permissions": [
     "tabs",
     "scripting",
-    "storage",
-    "activeTab"
+    "storage"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -21,6 +20,5 @@
     "default_title": "FocusTabs"
   },
   "options_page": "settings/settings.html",
-  "content_scripts": [],
-  "icons": {}
+  "content_scripts": []
 }
