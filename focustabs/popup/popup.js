@@ -80,7 +80,6 @@ function renderResults(suggestions) {
   });
 
   updateCloseCount();
-  list.addEventListener("change", updateCloseCount);
   showState("results");
 }
 
@@ -130,24 +129,29 @@ async function loadArchive() {
   archive.forEach((item) => {
     const li = document.createElement("li");
     li.className = "archive-item";
-    li.innerHTML = `
-      <img class="archive-favicon" src="${escapeHtml(item.favicon || "")}" onerror="this.style.visibility=\'hidden\'" alt="" />
-      <div class="archive-info">
-        <div class="archive-title" title="${escapeHtml(item.url)}">${escapeHtml(truncate(item.title, 40))}</div>
-        <div class="archive-time">${formatTimeAgo(item.archivedAt)}</div>
-      </div>
-      <button class="restore-btn" data-url="${escapeHtml(item.url)}">&#8617; Restore</button>`;
-    list.appendChild(li);
-  });
 
-  // Use event delegation for restore buttons
-  list.addEventListener("click", async (e) => {
-    const btn = e.target.closest(".restore-btn");
-    if (!btn) return;
-    btn.disabled = true;
-    const url = btn.dataset.url;
-    await sendMessage({ type: "RESTORE_TAB", url });
-    await loadArchive(); // refresh
+    // Build img via DOM property (avoids javascript: URI injection via innerHTML attribute)
+    const img = document.createElement("img");
+    img.className = "archive-favicon";
+    img.src = item.favicon || "";
+    img.alt = "";
+    img.onerror = () => { img.style.visibility = "hidden"; };
+
+    const info = document.createElement("div");
+    info.className = "archive-info";
+    info.innerHTML = `
+      <div class="archive-title" title="${escapeHtml(item.url)}">${escapeHtml(truncate(item.title, 40))}</div>
+      <div class="archive-time">${formatTimeAgo(item.archivedAt)}</div>`;
+
+    const btn = document.createElement("button");
+    btn.className = "restore-btn";
+    btn.dataset.url = item.url;
+    btn.textContent = "↩ Restore";
+
+    li.appendChild(img);
+    li.appendChild(info);
+    li.appendChild(btn);
+    list.appendChild(li);
   });
 }
 
@@ -165,7 +169,15 @@ function showError(msg) {
 }
 
 function sendMessage(msg) {
-  return new Promise((resolve) => chrome.runtime.sendMessage(msg, resolve));
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(msg, (response) => {
+      if (chrome.runtime.lastError) {
+        resolve({ error: chrome.runtime.lastError.message });
+      } else {
+        resolve(response ?? {});
+      }
+    });
+  });
 }
 
 function truncate(str, max) {
@@ -182,6 +194,7 @@ function escapeHtml(str) {
 }
 
 function formatTimeAgo(ts) {
+  if (!ts || isNaN(ts)) return "unknown";
   const diff = Date.now() - ts;
   const minutes = Math.floor(diff / 60000);
   if (minutes < 1) return "just now";
@@ -192,5 +205,18 @@ function formatTimeAgo(ts) {
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
+
+// Register archive restore listener once (event delegation)
+$("#archive-list").addEventListener("click", async (e) => {
+  const btn = e.target.closest(".restore-btn");
+  if (!btn) return;
+  btn.disabled = true;
+  const url = btn.dataset.url;
+  await sendMessage({ type: "RESTORE_TAB", url });
+  await loadArchive();
+});
+
+// Register suggestions change listener once
+$("#suggestions-list").addEventListener("change", updateCloseCount);
 
 initIdle();

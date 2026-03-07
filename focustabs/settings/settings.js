@@ -28,6 +28,12 @@ saveBtn.addEventListener('click', async () => {
   const model = modelSelect.value;
 
   hideMessages();
+
+  if (!apiKey) {
+    showError('Please enter an API key before saving.');
+    return;
+  }
+
   saveBtn.disabled = true;
 
   try {
