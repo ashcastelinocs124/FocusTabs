@@ -65,6 +65,9 @@ async function removeFromArchive(url) {
 }
 
 // ─── LLM helpers ─────────────────────────────────────────────────────────────
+// NOTE: The following functions duplicate utils/llm.js and utils/prompt.js because
+// the background service worker cannot use ES module imports without a bundler.
+// If you change prompt format or LLM request shape, update both this file AND utils/.
 
 const ENDPOINTS = {
   'gpt-4o': 'https://api.openai.com/v1/chat/completions',
@@ -127,6 +130,12 @@ function parseLLMResponse(raw) {
   const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
   const parsed = JSON.parse(cleaned);
   if (!Array.isArray(parsed)) throw new Error('Expected JSON array from LLM');
+  parsed.forEach((item, i) => {
+    if (typeof item.index !== 'number')
+      throw new Error(`LLM response item ${i}: 'index' must be a number`);
+    if (typeof item.relevant !== 'boolean')
+      throw new Error(`LLM response item ${i}: 'relevant' must be a boolean`);
+  });
   return parsed;
 }
 
@@ -283,14 +292,16 @@ async function handleAnalyze() {
     .filter((r) => !r.relevant)
     .map((r) => {
       const tab = summaries[r.index];
+      if (!tab) return null; // LLM returned an out-of-bounds index
       return {
-        tabId: tab?.tabId,
-        title: tab?.title ?? '',
-        url: tab?.url ?? '',
-        favicon: tab?.favicon ?? '',
+        tabId: tab.tabId,
+        title: tab.title ?? '',
+        url: tab.url ?? '',
+        favicon: tab.favicon ?? '',
         reason: r.reason ?? '',
       };
-    });
+    })
+    .filter(Boolean);
 
   return { suggestions, focusTab: activeFocus };
 }
