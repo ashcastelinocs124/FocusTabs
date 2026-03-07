@@ -1,5 +1,5 @@
 ---
-name: max-wigium
+name: max-wiggum
 description: Use when you want to go fully end-to-end from raw idea to working tested code in one session. Chains brainstorm-to-arch (idea → debate → system architecture) into arch-to-code (architecture → paired test+code subagents per task → committed implementation). One command, full pipeline.
 ---
 
