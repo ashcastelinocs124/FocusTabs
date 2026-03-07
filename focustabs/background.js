@@ -70,8 +70,8 @@ async function removeFromArchive(url) {
 // If you change prompt format or LLM request shape, update both this file AND utils/.
 
 const ENDPOINTS = {
-  'gpt-6': 'https://api.openai.com/v1/chat/completions',
-  'gpt-6-mini': 'https://api.openai.com/v1/chat/completions',
+  'gpt-5': 'https://api.openai.com/v1/chat/completions',
+  'gpt-5-mini': 'https://api.openai.com/v1/chat/completions',
   'gpt-4o': 'https://api.openai.com/v1/chat/completions',
   'gpt-4o-mini': 'https://api.openai.com/v1/chat/completions',
   'claude-3-5-sonnet': 'https://api.anthropic.com/v1/messages',
