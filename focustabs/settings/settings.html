@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>FocusTabs Settings</title>
+  <link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>FocusTabs Settings</h1>
+
+    <section>
+      <label for="model-select">AI Model</label>
+      <select id="model-select">
+        <option value="gpt-4o">OpenAI GPT-4o</option>
+        <option value="gpt-4o-mini">OpenAI GPT-4o Mini (cheaper, faster)</option>
+        <option value="claude-3-5-sonnet">Anthropic Claude 3.5 Sonnet</option>
+        <option value="gemini-pro">Google Gemini Pro</option>
+      </select>
+    </section>
+
+    <section>
+      <label for="api-key">API Key</label>
+      <input
+        type="password"
+        id="api-key"
+        placeholder="sk-... / sk-ant-... / AIza..."
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <p class="hint">
+        Your key is stored locally on this device only and never sent anywhere except directly to the AI provider.
+      </p>
+    </section>
+
+    <button id="save-btn">Save Settings</button>
+    <p class="status hidden" id="status">✓ Saved</p>
+    <p class="error hidden" id="error-msg"></p>
+  </div>
+  <script src="settings.js"></script>
+</body>
+</html>
