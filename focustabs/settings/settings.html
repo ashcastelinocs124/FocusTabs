@@ -12,10 +12,20 @@
     <section>
       <label for="model-select">AI Model</label>
       <select id="model-select">
-        <option value="gpt-4o">OpenAI GPT-4o</option>
-        <option value="gpt-4o-mini">OpenAI GPT-4o Mini (cheaper, faster)</option>
-        <option value="claude-3-5-sonnet">Anthropic Claude 3.5 Sonnet</option>
-        <option value="gemini-pro">Google Gemini Pro</option>
+        <optgroup label="OpenAI — Latest">
+          <option value="gpt-6">GPT-6 (most capable)</option>
+          <option value="gpt-6-mini">GPT-6 Mini (faster, cheaper)</option>
+        </optgroup>
+        <optgroup label="OpenAI — Previous">
+          <option value="gpt-4o">GPT-4o</option>
+          <option value="gpt-4o-mini">GPT-4o Mini</option>
+        </optgroup>
+        <optgroup label="Anthropic">
+          <option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
+        </optgroup>
+        <optgroup label="Google">
+          <option value="gemini-pro">Gemini Pro</option>
+        </optgroup>
       </select>
     </section>
 

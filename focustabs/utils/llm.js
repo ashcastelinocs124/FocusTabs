@@ -1,6 +1,8 @@
 // llm.js — LLM API client supporting OpenAI, Anthropic, and Gemini
 
 const ENDPOINTS = {
+  'gpt-6': 'https://api.openai.com/v1/chat/completions',
+  'gpt-6-mini': 'https://api.openai.com/v1/chat/completions',
   'gpt-4o': 'https://api.openai.com/v1/chat/completions',
   'gpt-4o-mini': 'https://api.openai.com/v1/chat/completions',
   'claude-3-5-sonnet': 'https://api.anthropic.com/v1/messages',
