@@ -8,14 +8,17 @@ const DEFAULTS = {
 
 const MODELS = {
   OPENAI: ['gpt-5', 'gpt-5-mini', 'gpt-4o', 'gpt-4o-mini'],
-  ANTHROPIC: ['claude-3-5-sonnet'],
+  ANTHROPIC: ['claude-sonnet-4', 'claude-3-5-sonnet'],
   GEMINI: ['gemini-pro'],
 };
 
 const DEFAULT_MODEL_BY_PROVIDER = {
   openai: 'gpt-5-mini',
-  anthropic: 'claude-3-5-sonnet',
+  anthropic: 'claude-sonnet-4',
   gemini: 'gemini-pro',
+};
+const MODEL_ALIASES = {
+  'claude-3-5-sonnet': 'claude-sonnet-4',
 };
 
 function getProviderForModel(model) {
@@ -34,7 +37,7 @@ function detectProviderFromApiKey(apiKey) {
 }
 
 function normalizeModelForUser({ apiKey, model }) {
-  const requestedModel = model ?? DEFAULTS.model;
+  const requestedModel = MODEL_ALIASES[model] ?? model ?? DEFAULTS.model;
   const modelProvider = getProviderForModel(requestedModel);
   const keyProvider = detectProviderFromApiKey(apiKey);
 

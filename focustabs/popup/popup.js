@@ -270,7 +270,9 @@ function renderResults(suggestions, workflowAnalysis = {}) {
     $("#results-header").textContent = "All tabs look relevant to your current focus.";
     $("#suggestions-list").innerHTML = "";
     $("#archive-btn").disabled = true;
+    $("#delete-close-btn").disabled = true;
     $("#close-count").textContent = "0";
+    $("#delete-close-count").textContent = "0";
     showState("results");
     return;
   }
@@ -333,10 +335,20 @@ function renderWorkflowInsights(hypotheses = [], workflowOptimization = {}) {
 function updateCloseCount() {
   const checked = document.querySelectorAll("#suggestions-list input[type=checkbox]:checked").length;
   $("#close-count").textContent = checked;
+  $("#delete-close-count").textContent = checked;
   $("#archive-btn").disabled = checked === 0;
+  $("#delete-close-btn").disabled = checked === 0;
 }
 
 $("#archive-btn").addEventListener("click", async () => {
+  await closeSelectedTabs({ archive: true });
+});
+
+$("#delete-close-btn").addEventListener("click", async () => {
+  await closeSelectedTabs({ archive: false });
+});
+
+async function closeSelectedTabs({ archive }) {
   const checked = [...document.querySelectorAll("#suggestions-list input[type=checkbox]:checked")];
   const indicesToClose = checked.map((cb) => parseInt(cb.id.replace("chk-", ""), 10));
   const tabsToClose = indicesToClose.map((i) => currentSuggestions[i]);
@@ -345,14 +357,19 @@ $("#archive-btn").addEventListener("click", async () => {
   if (tabIds.length === 0) return;
 
   $("#archive-btn").disabled = true;
+  $("#delete-close-btn").disabled = true;
   try {
-    const result = await sendMessage({ type: "ARCHIVE_TABS", tabIds, tabs: tabsToClose });
+    const result = await sendMessage({
+      type: archive ? "ARCHIVE_TABS" : "CLOSE_TABS",
+      tabIds,
+      tabs: tabsToClose,
+    });
     if (result.error) throw new Error(result.error);
     await initIdle();
   } catch (err) {
     showError(err.message);
   }
-});
+}
 
 $("#cancel-btn").addEventListener("click", initIdle);
 
@@ -393,11 +410,23 @@ async function loadArchive() {
     const btn = document.createElement("button");
     btn.className = "restore-btn";
     btn.dataset.url = item.url;
+    btn.dataset.archivedAt = String(item.archivedAt ?? "");
     btn.textContent = "↩ Restore";
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "delete-btn";
+    deleteBtn.dataset.url = item.url;
+    deleteBtn.dataset.archivedAt = String(item.archivedAt ?? "");
+    deleteBtn.textContent = "Delete";
+
+    const actions = document.createElement("div");
+    actions.className = "archive-actions";
+    actions.appendChild(btn);
+    actions.appendChild(deleteBtn);
 
     li.appendChild(img);
     li.appendChild(info);
-    li.appendChild(btn);
+    li.appendChild(actions);
     list.appendChild(li);
   });
 }
@@ -471,11 +500,22 @@ function formatTimeAgo(ts) {
 
 // Register archive restore listener once (event delegation)
 $("#archive-list").addEventListener("click", async (e) => {
-  const btn = e.target.closest(".restore-btn");
-  if (!btn) return;
-  btn.disabled = true;
-  const url = btn.dataset.url;
-  await sendMessage({ type: "RESTORE_TAB", url });
+  const restoreBtn = e.target.closest(".restore-btn");
+  if (restoreBtn) {
+    restoreBtn.disabled = true;
+    const url = restoreBtn.dataset.url;
+    const archivedAt = Number(restoreBtn.dataset.archivedAt);
+    await sendMessage({ type: "RESTORE_TAB", url, archivedAt: Number.isFinite(archivedAt) ? archivedAt : null });
+    await loadArchive();
+    return;
+  }
+
+  const deleteBtn = e.target.closest(".delete-btn");
+  if (!deleteBtn) return;
+  deleteBtn.disabled = true;
+  const url = deleteBtn.dataset.url;
+  const archivedAt = Number(deleteBtn.dataset.archivedAt);
+  await sendMessage({ type: "DELETE_ARCHIVE_ENTRY", url, archivedAt: Number.isFinite(archivedAt) ? archivedAt : null });
   await loadArchive();
 });
 

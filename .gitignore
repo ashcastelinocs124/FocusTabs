@@ -4,3 +4,6 @@ __pycache__/
 .DS_Store
 mcp/servers.json
 .claude/
+focustabs-1.0.0.zip
+video/node_modules/
+video/out/

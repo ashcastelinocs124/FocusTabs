@@ -5,6 +5,7 @@ const ENDPOINTS = {
   'gpt-5-mini': 'https://api.openai.com/v1/responses',
   'gpt-4o': 'https://api.openai.com/v1/chat/completions',
   'gpt-4o-mini': 'https://api.openai.com/v1/chat/completions',
+  'claude-sonnet-4': 'https://api.anthropic.com/v1/messages',
   'claude-3-5-sonnet': 'https://api.anthropic.com/v1/messages',
   'gemini-pro': 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
 };
@@ -12,7 +13,9 @@ const OPENAI_CHAT_COMPLETIONS_ENDPOINT = 'https://api.openai.com/v1/chat/complet
 
 // Maps short model keys to the full versioned model IDs required by each API
 const ANTHROPIC_MODEL_IDS = {
-  'claude-3-5-sonnet': 'claude-3-5-sonnet-20241022',
+  'claude-sonnet-4': 'claude-sonnet-4-20250514',
+  // Legacy setting compatibility
+  'claude-3-5-sonnet': 'claude-sonnet-4-20250514',
 };
 
 function parseLLMResponse(raw) {
@@ -139,6 +142,7 @@ async function callAnthropic({ apiKey, model, systemMessage, userMessage }) {
       'Content-Type': 'application/json',
       'x-api-key': apiKey,
       'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({
       model: anthropicModel,

@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "lib": ["dom", "es2020"],
+    "module": "commonjs",
+    "target": "es2020",
+    "strict": true,
+    "outDir": "dist",
+    "jsx": "react",
+    "allowJs": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*", "remotion.config.ts"]
+}

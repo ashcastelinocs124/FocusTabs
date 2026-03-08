@@ -15,9 +15,18 @@ describe('storage', () => {
 
   test('saveSettings writes to storage', async () => {
     chrome.storage.local.set.mockImplementation((obj, cb) => { cb && cb(); });
-    await saveSettings({ apiKey: 'sk-ant-test', model: 'claude-3-5-sonnet' });
+    await saveSettings({ apiKey: 'sk-ant-test', model: 'claude-sonnet-4' });
     expect(chrome.storage.local.set).toHaveBeenCalledWith(
-      expect.objectContaining({ apiKey: 'sk-ant-test', model: 'claude-3-5-sonnet' }),
+      expect.objectContaining({ apiKey: 'sk-ant-test', model: 'claude-sonnet-4' }),
+      expect.any(Function)
+    );
+  });
+
+  test('saveSettings normalizes model for Anthropic key when mismatched', async () => {
+    chrome.storage.local.set.mockImplementation((obj, cb) => { cb && cb(); });
+    await saveSettings({ apiKey: 'sk-ant-test', model: 'gpt-5' });
+    expect(chrome.storage.local.set).toHaveBeenCalledWith(
+      expect.objectContaining({ apiKey: 'sk-ant-test', model: 'claude-sonnet-4' }),
       expect.any(Function)
     );
   });
@@ -66,11 +75,11 @@ describe('storage', () => {
 
   test('getSettings returns stored values when present', async () => {
     chrome.storage.local.get.mockImplementation((keys, cb) =>
-      cb({ apiKey: 'sk-ant-live', model: 'claude-3-5-sonnet' })
+      cb({ apiKey: 'sk-ant-live', model: 'claude-sonnet-4' })
     );
     const settings = await getSettings();
     expect(settings.apiKey).toBe('sk-ant-live');
-    expect(settings.model).toBe('claude-3-5-sonnet');
+    expect(settings.model).toBe('claude-sonnet-4');
   });
 
   test('normalizes model when API key provider and model provider do not match', async () => {
@@ -79,7 +88,16 @@ describe('storage', () => {
     );
     const settings = await getSettings();
     expect(settings.apiKey).toBe('sk-ant-live');
-    expect(settings.model).toBe('claude-3-5-sonnet');
+    expect(settings.model).toBe('claude-sonnet-4');
+  });
+
+  test('normalizes legacy Claude 3.5 selection to Claude Sonnet 4', async () => {
+    chrome.storage.local.get.mockImplementation((keys, cb) =>
+      cb({ apiKey: 'sk-ant-live', model: 'claude-3-5-sonnet' })
+    );
+    const settings = await getSettings();
+    expect(settings.apiKey).toBe('sk-ant-live');
+    expect(settings.model).toBe('claude-sonnet-4');
   });
 
   test('getArchive returns empty array when storage is empty', async () => {

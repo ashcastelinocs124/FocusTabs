@@ -173,7 +173,7 @@ describe('callLLM - Anthropic', () => {
     global.fetch = jest.fn();
   });
 
-  test('calls Anthropic endpoint for claude-3-5-sonnet', async () => {
+  test('calls Anthropic endpoint for claude-sonnet-4', async () => {
     global.fetch.mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -182,7 +182,7 @@ describe('callLLM - Anthropic', () => {
     });
 
     const result = await callLLM({
-      model: 'claude-3-5-sonnet',
+      model: 'claude-sonnet-4',
       apiKey: 'sk-ant-test',
       systemMessage: 'sys',
       userMessage: 'user',
@@ -194,7 +194,7 @@ describe('callLLM - Anthropic', () => {
     );
     // Verify the versioned model ID is used in the request body
     const body = JSON.parse(global.fetch.mock.calls[0][1].body);
-    expect(body.model).toBe('claude-3-5-sonnet-20241022');
+    expect(body.model).toBe('claude-sonnet-4-20250514');
     expect(result).toHaveLength(1);
     expect(result[0].relevant).toBe(true);
   });
@@ -202,7 +202,7 @@ describe('callLLM - Anthropic', () => {
   test('throws on Anthropic non-ok response', async () => {
     global.fetch.mockResolvedValue({ ok: false, status: 429, text: async () => 'Rate limited' });
     await expect(
-      callLLM({ model: 'claude-3-5-sonnet', apiKey: 'key', systemMessage: 's', userMessage: 'u' })
+      callLLM({ model: 'claude-sonnet-4', apiKey: 'key', systemMessage: 's', userMessage: 'u' })
     ).rejects.toThrow('429');
   });
 });

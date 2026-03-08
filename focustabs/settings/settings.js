@@ -14,13 +14,17 @@ const MODEL_PROVIDER = {
   'gpt-5-mini': 'openai',
   'gpt-4o': 'openai',
   'gpt-4o-mini': 'openai',
+  'claude-sonnet-4': 'anthropic',
   'claude-3-5-sonnet': 'anthropic',
   'gemini-pro': 'gemini',
 };
 const DEFAULT_MODEL_BY_PROVIDER = {
   openai: 'gpt-5-mini',
-  anthropic: 'claude-3-5-sonnet',
+  anthropic: 'claude-sonnet-4',
   gemini: 'gemini-pro',
+};
+const MODEL_ALIASES = {
+  'claude-3-5-sonnet': 'claude-sonnet-4',
 };
 
 function detectProviderFromApiKey(apiKey) {
@@ -32,7 +36,7 @@ function detectProviderFromApiKey(apiKey) {
 }
 
 function normalizeModelForUser({ apiKey, model }) {
-  const requestedModel = model ?? DEFAULT_MODEL;
+  const requestedModel = MODEL_ALIASES[model] ?? model ?? DEFAULT_MODEL;
   const modelProvider = MODEL_PROVIDER[requestedModel];
   const keyProvider = detectProviderFromApiKey(apiKey);
 

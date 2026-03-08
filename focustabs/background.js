@@ -1,6 +1,6 @@
 // background.js — FocusTabs service worker
 // Self-contained: no ES module imports (utils use CommonJS for testing).
-// Handles messages from popup: ANALYZE, ARCHIVE_TABS, RESTORE_TAB, GET_ARCHIVE.
+// Handles messages from popup: ANALYZE, ARCHIVE_TABS, CLOSE_TABS, RESTORE_TAB, GET_ARCHIVE.
 
 // ─── Storage helpers ─────────────────────────────────────────────────────────
 
@@ -12,7 +12,7 @@ const AUTO_POPUP_COOLDOWN_MS = 2 * 60 * 1000;
 const RECENT_ANALYZE_TAB_LIMIT = 12;
 const DEFAULT_MODEL_BY_PROVIDER = {
   openai: 'gpt-5-mini',
-  anthropic: 'claude-3-5-sonnet',
+  anthropic: 'claude-sonnet-4',
   gemini: 'gemini-pro',
 };
 const windowTabThresholdState = new Map(); // windowId -> whether prompt has been shown while currently above threshold
@@ -98,9 +98,20 @@ async function getRecentTabActivity(limit = 15) {
   return tabActivity.slice(-Math.max(0, limit)).reverse();
 }
 
-async function removeFromArchive(url) {
+async function removeFromArchive(url, archivedAt = null) {
   const data = await storageGet(['archive']);
-  const archive = (data.archive ?? []).filter((e) => e.url !== url);
+  const source = data.archive ?? [];
+  let removed = false;
+  const archive = source.filter((e) => {
+    if (removed) return true;
+    const isUrlMatch = e.url === url;
+    const isTimestampMatch = archivedAt === null || Number(e.archivedAt) === Number(archivedAt);
+    if (isUrlMatch && isTimestampMatch) {
+      removed = true;
+      return false;
+    }
+    return true;
+  });
   await storageSet({ archive });
 }
 
@@ -261,13 +272,19 @@ const ENDPOINTS = {
   'gpt-5-mini': 'https://api.openai.com/v1/responses',
   'gpt-4o': 'https://api.openai.com/v1/chat/completions',
   'gpt-4o-mini': 'https://api.openai.com/v1/chat/completions',
+  'claude-sonnet-4': 'https://api.anthropic.com/v1/messages',
   'claude-3-5-sonnet': 'https://api.anthropic.com/v1/messages',
   'gemini-pro': 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
 };
 const OPENAI_CHAT_COMPLETIONS_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 
 const ANTHROPIC_MODEL_IDS = {
-  'claude-3-5-sonnet': 'claude-3-5-sonnet-20241022',
+  'claude-sonnet-4': 'claude-sonnet-4-20250514',
+  // Legacy user setting compatibility: route retired 3.5 Sonnet to a current Sonnet model.
+  'claude-3-5-sonnet': 'claude-sonnet-4-20250514',
+};
+const MODEL_ALIASES = {
+  'claude-3-5-sonnet': 'claude-sonnet-4',
 };
 
 function getProviderForModel(model) {
@@ -286,7 +303,7 @@ function detectProviderFromApiKey(apiKey) {
 }
 
 function normalizeModelForUser({ apiKey, model }) {
-  const requestedModel = model ?? DEFAULTS.model;
+  const requestedModel = MODEL_ALIASES[model] ?? model ?? DEFAULTS.model;
   const keyProvider = detectProviderFromApiKey(apiKey);
   const modelProvider = getProviderForModel(requestedModel);
 
@@ -736,6 +753,7 @@ async function callLLMText({ model, apiKey, systemMessage, userMessage }) {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
         model: anthropicModel,
@@ -830,8 +848,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .catch((err) => sendResponse({ error: err.message }));
     return true;
   }
+  if (message.type === 'CLOSE_TABS') {
+    handleCloseTabs(message.tabIds, message.tabs)
+      .then(sendResponse)
+      .catch((err) => sendResponse({ error: err.message }));
+    return true;
+  }
   if (message.type === 'RESTORE_TAB') {
-    handleRestore(message.url)
+    handleRestore(message.url, message.archivedAt)
+      .then(sendResponse)
+      .catch((err) => sendResponse({ error: err.message }));
+    return true;
+  }
+  if (message.type === 'DELETE_ARCHIVE_ENTRY') {
+    handleDeleteArchiveEntry(message.url, message.archivedAt)
       .then(sendResponse)
       .catch((err) => sendResponse({ error: err.message }));
     return true;
@@ -1163,8 +1193,35 @@ async function handleArchive(tabIds, tabs) {
   return { status: 'ok' };
 }
 
-async function handleRestore(url) {
+async function handleCloseTabs(tabIds, tabs) {
+  const now = Date.now();
+  const allTabs = await chrome.tabs.query({ currentWindow: true });
+  const activeTab = allTabs.find((t) => t.active);
+
+  for (const tab of tabs ?? []) {
+    await addDecision({
+      activeUrl: activeTab?.url ?? '',
+      activeTitle: activeTab?.title ?? '',
+      tabUrl: tab.url,
+      tabTitle: tab.title,
+      action: 'close',
+      userOverrode: false,
+      timestamp: now,
+    });
+  }
+
+  await chrome.tabs.remove(tabIds ?? []);
+  return { status: 'ok' };
+}
+
+async function handleRestore(url, archivedAt = null) {
   await chrome.tabs.create({ url, active: false });
-  await removeFromArchive(url);
+  await removeFromArchive(url, archivedAt);
+  return { status: 'ok' };
+}
+
+async function handleDeleteArchiveEntry(url, archivedAt = null) {
+  if (!url) throw new Error('Archive URL is required.');
+  await removeFromArchive(url, archivedAt);
   return { status: 'ok' };
 }

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FocusTabs — Privacy Policy</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", system-ui, sans-serif;
+      font-size: 16px;
+      line-height: 1.7;
+      color: #1e293b;
+      background: #f8fafc;
+    }
+
+    header {
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      color: white;
+      padding: 40px 24px;
+      text-align: center;
+    }
+
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    header p {
+      font-size: 15px;
+      opacity: 0.85;
+    }
+
+    main {
+      max-width: 720px;
+      margin: 48px auto;
+      padding: 0 24px 80px;
+    }
+
+    .card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 32px 36px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+
+    .updated {
+      font-size: 13px;
+      color: #64748b;
+      margin-bottom: 28px;
+    }
+
+    h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-top: 32px;
+      margin-bottom: 10px;
+    }
+
+    h2:first-of-type { margin-top: 0; }
+
+    p { color: #334155; margin-bottom: 12px; }
+
+    ul {
+      padding-left: 20px;
+      margin-bottom: 12px;
+      color: #334155;
+    }
+
+    ul li { margin-bottom: 6px; }
+
+    .highlight {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin: 20px 0;
+      color: #166534;
+      font-size: 15px;
+    }
+
+    a { color: #6366f1; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    footer {
+      text-align: center;
+      font-size: 13px;
+      color: #94a3b8;
+      margin-top: 48px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+    </svg>
+    FocusTabs
+  </div>
+  <p>Privacy Policy</p>
+</header>
+
+<main>
+  <div class="card">
+    <p class="updated">Last updated: March 2026</p>
+
+    <div class="highlight">
+      <strong>Short version:</strong> FocusTabs does not collect, store, or share any personal data.
+      Your API keys and tab data never leave your device except to call the AI provider you configure.
+    </div>
+
+    <h2>What FocusTabs Does</h2>
+    <p>
+      FocusTabs is a Chrome extension that uses AI to help you manage browser tabs.
+      It reads your open tabs, sends their titles and brief text summaries to an AI
+      service of your choosing (OpenAI, Anthropic, or Google Gemini), and uses the
+      AI's response to suggest which tabs are irrelevant to your current focus.
+    </p>
+
+    <h2>Data We Access</h2>
+    <ul>
+      <li><strong>Tab titles and URLs</strong> — read to identify open tabs</li>
+      <li><strong>Page text summaries</strong> — up to 500 characters of visible page text per tab,
+        used to give the AI context about what each tab contains</li>
+      <li><strong>Your API key</strong> — stored locally in <code>chrome.storage.local</code>
+        on your device only</li>
+      <li><strong>Model preference and user context</strong> — stored locally in
+        <code>chrome.storage.local</code> on your device only</li>
+    </ul>
+
+    <h2>Data We Do NOT Collect</h2>
+    <ul>
+      <li>We do not operate any servers</li>
+      <li>We do not collect analytics or usage statistics</li>
+      <li>We do not store browsing history beyond what Chrome already records</li>
+      <li>We do not share any data with third parties (other than the AI provider you choose)</li>
+      <li>We do not use cookies or tracking technologies</li>
+    </ul>
+
+    <h2>Third-Party AI Services</h2>
+    <p>
+      When you click "Analyze My Tabs", FocusTabs sends tab titles, URLs, and
+      page summaries directly from your browser to the AI provider you configured:
+    </p>
+    <ul>
+      <li><strong>OpenAI</strong> — <a href="https://openai.com/privacy" target="_blank" rel="noopener">openai.com/privacy</a></li>
+      <li><strong>Anthropic</strong> — <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener">anthropic.com/privacy</a></li>
+      <li><strong>Google Gemini</strong> — <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">policies.google.com/privacy</a></li>
+    </ul>
+    <p>
+      Your API key is stored only on your device and is sent directly to the provider's API.
+      FocusTabs never sees or stores your API key on any external server.
+    </p>
+
+    <h2>Why We Need Host Permissions</h2>
+    <p>
+      FocusTabs requests access to all URLs (<code>&lt;all_urls&gt;</code>) because it uses
+      Chrome's <code>scripting</code> API to extract a brief text summary from each open tab.
+      This is the core feature of the extension — without reading page content, the AI cannot
+      determine which tabs are relevant to your work. The extension only reads content when you
+      explicitly click "Analyze My Tabs".
+    </p>
+
+    <h2>Data Storage</h2>
+    <p>
+      All data is stored locally on your device using <code>chrome.storage.local</code>:
+    </p>
+    <ul>
+      <li>Your API key and model selection</li>
+      <li>Your archived tabs (tabs you've chosen to close and may want to restore)</li>
+      <li>A limited history of past tab decisions (capped at 100 entries) used to personalize future analyses</li>
+    </ul>
+    <p>
+      This data is never transmitted anywhere other than to your chosen AI provider during analysis.
+      You can clear it at any time via Chrome's extension storage or by removing the extension.
+    </p>
+
+    <h2>Children's Privacy</h2>
+    <p>
+      FocusTabs is not directed at children under 13 and does not knowingly collect
+      information from children.
+    </p>
+
+    <h2>Changes to This Policy</h2>
+    <p>
+      If this policy changes materially, the updated date at the top of this page will reflect it.
+      Continued use of the extension after changes constitutes acceptance.
+    </p>
+
+    <h2>Contact</h2>
+    <p>
+      Questions about this privacy policy? Open an issue on
+      <a href="https://github.com/focustabs/focustabs" target="_blank" rel="noopener">GitHub</a>
+      or email the maintainer listed in the repository.
+    </p>
+  </div>
+
+  <footer>
+    FocusTabs · Chrome Extension · MIT License
+  </footer>
+</main>
+
+</body>
+</html>
