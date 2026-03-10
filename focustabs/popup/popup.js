@@ -63,7 +63,7 @@ async function startWorkflowSelection() {
   hideWorkflowPickerError();
   try {
     const settings = await getFrontendSettings();
-    const response = await sendMessage({ type: "GET_WORKFLOW_RECOMMENDATIONS", ...settings });
+    const response = await sendMessage({ type: "GET_WORKFLOW_RECOMMENDATIONS", useAI: false, ...settings });
     if (response.error) throw new Error(response.error);
     const options = Array.isArray(response.workflowOptions) ? response.workflowOptions : [];
     workflowOptions = options.slice(0, WORKFLOW_RECENT_OPTION_COUNT).map((item, idx) => ({
@@ -89,35 +89,52 @@ async function startWorkflowSelection() {
 }
 
 function confirmWorkflowSelection() {
-  const selected = document.querySelector('input[name="workflow-option"]:checked');
-  if (!selected) {
-    showWorkflowPickerError("Pick an option before analyzing.");
-    return;
-  }
-  let selectedWorkflow = "";
-  if (selected.value === "custom") {
-    selectedWorkflow = $("#workflow-custom-input").value.trim();
-    if (!selectedWorkflow) {
-      showWorkflowPickerError("Type your workflow for option 4.");
+  const selectedValues = Array.from(document.querySelectorAll('input[name="workflow-option"]:checked')).map((input) => input.value);
+  const selectedKeys = new Set(selectedValues);
+  const selectedWorkflows = workflowOptions
+    .filter((item) => selectedKeys.has(item.key))
+    .map((item) => item.name.trim())
+    .filter(Boolean);
+
+  if ($("#workflow-option-custom").checked) {
+    const customWorkflow = $("#workflow-custom-input").value.trim();
+    if (!customWorkflow) {
+      showWorkflowPickerError("Type your custom workflow or uncheck it.");
       return;
     }
-  } else {
-    const option = workflowOptions.find((item) => item.key === selected.value);
-    selectedWorkflow = option?.name?.trim() || "";
+    selectedWorkflows.push(customWorkflow);
   }
-  runAnalysis(selectedWorkflow);
+
+  const uniqueSelectedWorkflows = Array.from(new Set(selectedWorkflows));
+  if (uniqueSelectedWorkflows.length === 0) {
+    showWorkflowPickerError("Pick at least one workflow before analyzing.");
+    return;
+  }
+
+  const excludedWorkflows = workflowOptions
+    .filter((item) => !selectedKeys.has(item.key))
+    .map((item) => item.name.trim())
+    .filter(Boolean);
+
+  runAnalysis(uniqueSelectedWorkflows, excludedWorkflows);
 }
 
 function cancelWorkflowSelection() {
   hideWorkflowPicker();
 }
 
-async function runAnalysis(selectedWorkflow = "") {
+async function runAnalysis(selectedWorkflows = [], excludedWorkflows = []) {
   hideWorkflowPicker();
   showState("loading");
   try {
     const settings = await getFrontendSettings();
-    const result = await sendMessage({ type: "ANALYZE", selectedWorkflow, ...settings });
+    const result = await sendMessage({
+      type: "ANALYZE",
+      selectedWorkflows,
+      excludedWorkflows,
+      useAI: settings.aiEnabled,
+      ...settings,
+    });
     if (result.error) throw new Error(result.error);
     currentSuggestions = result.suggestions ?? [];
     renderResults(currentSuggestions, {
@@ -137,7 +154,7 @@ function renderWorkflowOptions(options = []) {
     const li = document.createElement("li");
     li.innerHTML = `
       <label class="workflow-option">
-        <input type="radio" name="workflow-option" value="${escapeHtml(item.key)}" ${idx === 0 ? "checked" : ""} />
+        <input type="checkbox" name="workflow-option" value="${escapeHtml(item.key)}" ${idx === 0 ? "checked" : ""} />
         <span>
           <div class="workflow-option-title">${idx + 1}. ${escapeHtml(truncate(item.name, 56))}</div>
           <div class="workflow-option-meta">Confidence: ${escapeHtml(pct)}</div>
@@ -314,7 +331,7 @@ function renderWorkflowInsights(hypotheses = [], workflowOptimization = {}) {
 
   wrapper.classList.remove("hidden");
   const currentWorkflow = workflowOptimization?.currentWorkflow || "Likely in a mixed context workflow";
-  current.textContent = `Most likely workflow: ${currentWorkflow}`;
+  current.textContent = `Kept workflows: ${currentWorkflow}`;
 
   list.innerHTML = "";
   normalizedHypotheses.forEach((item, idx) => {
@@ -380,14 +397,17 @@ async function loadArchive() {
   const archive = result.archive ?? [];
   const list = $("#archive-list");
   const empty = $("#archive-empty");
+  const toolbar = $("#archive-toolbar");
 
   list.innerHTML = "";
 
   if (archive.length === 0) {
+    toolbar.classList.add("hidden");
     empty.classList.remove("hidden");
     return;
   }
 
+  toolbar.classList.remove("hidden");
   empty.classList.add("hidden");
 
   archive.forEach((item) => {
@@ -431,6 +451,20 @@ async function loadArchive() {
   });
 }
 
+$("#archive-delete-all-btn").addEventListener("click", async () => {
+  const btn = $("#archive-delete-all-btn");
+  btn.disabled = true;
+  try {
+    const result = await sendMessage({ type: "CLEAR_ARCHIVE" });
+    if (result.error) throw new Error(result.error);
+    await loadArchive();
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function showState(state) {
@@ -458,7 +492,7 @@ function sendMessage(msg) {
 
 function getFrontendSettings() {
   return new Promise((resolve) => {
-    chrome.storage.local.get(["apiKey", "model", "userContext"], (data) => {
+    chrome.storage.local.get(["apiKey", "model", "userContext", "aiEnabled"], (data) => {
       if (chrome.runtime.lastError) {
         resolve({});
         return;
@@ -467,6 +501,7 @@ function getFrontendSettings() {
         apiKey: data.apiKey ?? "",
         model: data.model ?? "gpt-5-mini",
         userContext: data.userContext ?? "",
+        aiEnabled: data.aiEnabled !== false,
       });
     });
   });

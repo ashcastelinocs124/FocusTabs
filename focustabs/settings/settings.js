@@ -5,6 +5,7 @@ const apiKeyInput = document.getElementById('api-key');
 const saveBtn = document.getElementById('save-btn');
 const statusEl = document.getElementById('status');
 const errorEl = document.getElementById('error-msg');
+const aiEnabledInput = document.getElementById('ai-enabled');
 const autoPromptEnabledInput = document.getElementById('auto-prompt-enabled');
 const userContextInput = document.getElementById('user-context');
 
@@ -54,7 +55,7 @@ function getModelLabel(model) {
 async function loadSettings() {
   try {
     const data = await new Promise((resolve, reject) =>
-      chrome.storage.local.get(['apiKey', 'model', 'autoPromptEnabled', 'userContext'], (result) => {
+      chrome.storage.local.get(['apiKey', 'model', 'aiEnabled', 'autoPromptEnabled', 'userContext'], (result) => {
         if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
         else resolve(result);
       })
@@ -63,6 +64,7 @@ async function loadSettings() {
     const model = normalizeModelForUser({ apiKey, model: data.model });
     apiKeyInput.value = apiKey;
     modelSelect.value = model;
+    aiEnabledInput.checked = data.aiEnabled !== false;
     autoPromptEnabledInput.checked = Boolean(data.autoPromptEnabled);
     userContextInput.value = data.userContext ?? '';
   } catch (err) {
@@ -75,13 +77,14 @@ saveBtn.addEventListener('click', async () => {
   const apiKey = apiKeyInput.value.trim();
   const model = modelSelect.value;
   const normalizedModel = normalizeModelForUser({ apiKey, model });
+  const aiEnabled = aiEnabledInput.checked;
   const autoPromptEnabled = autoPromptEnabledInput.checked;
   const userContext = userContextInput.value.trim();
 
   hideMessages();
 
-  if (!apiKey) {
-    showError('Please enter an API key before saving.');
+  if (aiEnabled && !apiKey) {
+    showError('Please enter an API key before saving when AI analysis is enabled.');
     return;
   }
 
@@ -89,7 +92,7 @@ saveBtn.addEventListener('click', async () => {
 
   try {
     await new Promise((resolve, reject) =>
-      chrome.storage.local.set({ apiKey, model: normalizedModel, autoPromptEnabled, userContext }, () => {
+      chrome.storage.local.set({ apiKey, model: normalizedModel, aiEnabled, autoPromptEnabled, userContext }, () => {
         if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
         else resolve();
       })

@@ -7,10 +7,10 @@ export const Root: React.FC = () => {
     <Composition
       id="FocusTabsDemo"
       component={FocusTabsDemo}
-      durationInFrames={900}
+      durationInFrames={1800}
       fps={30}
-      width={1280}
-      height={720}
+      width={1920}
+      height={1080}
     />
   );
 };

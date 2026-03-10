@@ -4,6 +4,7 @@ const DEFAULTS = {
   apiKey: '',
   model: 'gpt-5-mini',
   userContext: '',
+  aiEnabled: true,
 };
 
 const MODELS = {
@@ -73,17 +74,23 @@ function storageSet(obj) {
 }
 
 async function getSettings() {
-  const data = await storageGet(['apiKey', 'model', 'userContext']);
+  const data = await storageGet(['apiKey', 'model', 'userContext', 'aiEnabled']);
   const apiKey = data.apiKey ?? DEFAULTS.apiKey;
   return {
     apiKey,
     model: normalizeModelForUser({ apiKey, model: data.model }),
     userContext: data.userContext ?? DEFAULTS.userContext,
+    aiEnabled: data.aiEnabled !== false,
   };
 }
 
-async function saveSettings({ apiKey = DEFAULTS.apiKey, model = DEFAULTS.model, userContext = DEFAULTS.userContext } = {}) {
-  await storageSet({ apiKey, model: normalizeModelForUser({ apiKey, model }), userContext });
+async function saveSettings({
+  apiKey = DEFAULTS.apiKey,
+  model = DEFAULTS.model,
+  userContext = DEFAULTS.userContext,
+  aiEnabled = DEFAULTS.aiEnabled,
+} = {}) {
+  await storageSet({ apiKey, model: normalizeModelForUser({ apiKey, model }), userContext, aiEnabled });
 }
 
 async function addDecision(decision) {
@@ -117,6 +124,10 @@ async function removeFromArchive(url) {
   await storageSet({ archive });
 }
 
+async function clearArchive() {
+  await storageSet({ archive: [] });
+}
+
 module.exports = {
   getSettings,
   saveSettings,
@@ -125,6 +136,7 @@ module.exports = {
   addToArchive,
   getArchive,
   removeFromArchive,
+  clearArchive,
   detectProviderFromApiKey,
   getProviderForModel,
   normalizeModelForUser,

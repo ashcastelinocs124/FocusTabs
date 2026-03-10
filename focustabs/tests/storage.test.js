@@ -1,5 +1,5 @@
 // We test storage.js by mocking chrome.storage.local via jest-chrome.
-const { getSettings, saveSettings, addDecision, getDecisions, addToArchive, getArchive, removeFromArchive } = require('../utils/storage');
+const { getSettings, saveSettings, addDecision, getDecisions, addToArchive, getArchive, removeFromArchive, clearArchive } = require('../utils/storage');
 
 describe('storage', () => {
   beforeEach(() => {
@@ -11,13 +11,14 @@ describe('storage', () => {
     const settings = await getSettings();
     expect(settings.model).toBe('gpt-5-mini');
     expect(settings.apiKey).toBe('');
+    expect(settings.aiEnabled).toBe(true);
   });
 
   test('saveSettings writes to storage', async () => {
     chrome.storage.local.set.mockImplementation((obj, cb) => { cb && cb(); });
-    await saveSettings({ apiKey: 'sk-ant-test', model: 'claude-sonnet-4' });
+    await saveSettings({ apiKey: 'sk-ant-test', model: 'claude-sonnet-4', aiEnabled: false });
     expect(chrome.storage.local.set).toHaveBeenCalledWith(
-      expect.objectContaining({ apiKey: 'sk-ant-test', model: 'claude-sonnet-4' }),
+      expect.objectContaining({ apiKey: 'sk-ant-test', model: 'claude-sonnet-4', aiEnabled: false }),
       expect.any(Function)
     );
   });
@@ -73,13 +74,23 @@ describe('storage', () => {
     expect(saved.archive[0].url).toBe('y.com');
   });
 
+  test('clearArchive removes all archived items', async () => {
+    let saved;
+    chrome.storage.local.set.mockImplementation((obj, cb) => { saved = obj; cb && cb(); });
+
+    await clearArchive();
+
+    expect(saved.archive).toEqual([]);
+  });
+
   test('getSettings returns stored values when present', async () => {
     chrome.storage.local.get.mockImplementation((keys, cb) =>
-      cb({ apiKey: 'sk-ant-live', model: 'claude-sonnet-4' })
+      cb({ apiKey: 'sk-ant-live', model: 'claude-sonnet-4', aiEnabled: false })
     );
     const settings = await getSettings();
     expect(settings.apiKey).toBe('sk-ant-live');
     expect(settings.model).toBe('claude-sonnet-4');
+    expect(settings.aiEnabled).toBe(false);
   });
 
   test('normalizes model when API key provider and model provider do not match', async () => {

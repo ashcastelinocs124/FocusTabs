@@ -4,7 +4,7 @@
 
 // ─── Storage helpers ─────────────────────────────────────────────────────────
 
-const DEFAULTS = { apiKey: '', model: 'gpt-5-mini', userContext: '' };
+const DEFAULTS = { apiKey: '', model: 'gpt-5-mini', userContext: '', aiEnabled: true };
 const DECISIONS_CAP = 100;
 const TAB_ACTIVITY_CAP = 200;
 const AUTO_POPUP_THRESHOLD = 5;
@@ -36,12 +36,13 @@ function storageSet(obj) {
 }
 
 async function getSettings() {
-  const data = await storageGet(['apiKey', 'model', 'userContext']);
+  const data = await storageGet(['apiKey', 'model', 'userContext', 'aiEnabled']);
   const apiKey = data.apiKey ?? DEFAULTS.apiKey;
   return {
     apiKey,
     model: normalizeModelForUser({ apiKey, model: data.model }),
     userContext: data.userContext ?? DEFAULTS.userContext,
+    aiEnabled: data.aiEnabled !== false,
   };
 }
 
@@ -113,6 +114,10 @@ async function removeFromArchive(url, archivedAt = null) {
     return true;
   });
   await storageSet({ archive });
+}
+
+async function clearArchive() {
+  await storageSet({ archive: [] });
 }
 
 async function getAutoPopupMeta() {
@@ -228,11 +233,12 @@ async function injectInlinePrompt(tabId) {
       analyzeBtn.addEventListener('click', () => {
         analyzeBtn.disabled = true;
         status.textContent = 'Analyzing your tabs...';
-        chrome.storage.local.get(['apiKey', 'model', 'userContext'], (data) => {
+        chrome.storage.local.get(['apiKey', 'model', 'userContext', 'aiEnabled'], (data) => {
           const apiKey = data?.apiKey ?? '';
           const model = data?.model ?? 'gpt-5-mini';
           const userContext = data?.userContext ?? '';
-          chrome.runtime.sendMessage({ type: 'ANALYZE', apiKey, model, userContext }, (result) => {
+          const aiEnabled = data?.aiEnabled !== false;
+          chrome.runtime.sendMessage({ type: 'ANALYZE', apiKey, model, userContext, useAI: aiEnabled }, (result) => {
             analyzeBtn.disabled = false;
             if (chrome.runtime.lastError) {
               status.textContent = `Error: ${chrome.runtime.lastError.message}`;
@@ -343,6 +349,8 @@ Return this exact shape:
 Rules:
 - Provide exactly 3 workflowHypotheses sorted by confidence descending.
 - tabDecisions must only use indexes from the provided tabs.
+- Treat user-selected workflows as the keep context.
+- Prefer marking tabs as not relevant when they primarily support unselected workflows, unless they clearly support a selected workflow too.
 - Keep all reason/evidence/recommendation text concise and actionable.`;
 const WORKFLOW_RECOMMENDER_SYSTEM_MESSAGE = `You are a focus assistant. Infer likely current workflows from recent browser context.
 
@@ -383,6 +391,12 @@ function sanitizeField(value) {
   return String(value);
 }
 
+const SEMANTIC_STOPWORDS = new Set([
+  'the', 'and', 'for', 'with', 'from', 'that', 'this', 'your', 'you', 'are', 'was', 'were', 'have', 'has', 'had',
+  'not', 'but', 'or', 'to', 'of', 'in', 'on', 'at', 'by', 'is', 'it', 'as', 'be', 'an', 'a', 'if', 'then',
+  'http', 'https', 'www', 'com', 'org', 'net', 'html', 'htm', 'php', 'asp',
+]);
+
 function formatAge(ts) {
   const deltaMs = Date.now() - ts;
   if (!Number.isFinite(deltaMs) || deltaMs < 0) return 'unknown time';
@@ -406,7 +420,8 @@ function buildPrompt(
   decisions,
   userContext = '',
   recentTabHistory = [],
-  selectedWorkflow = '',
+  selectedWorkflows = [],
+  excludedWorkflows = [],
   analysisScope = {}
 ) {
   const tabList = otherTabs
@@ -442,8 +457,11 @@ function buildPrompt(
 User context and priorities:
 ${userContext ? `  ${sanitizeField(userContext)}` : '  (not provided)'}
 
-User-selected current workflow:
-${selectedWorkflow ? `  ${sanitizeField(selectedWorkflow)}` : '  (not provided)'}
+User-selected workflows to keep:
+${selectedWorkflows.length ? selectedWorkflows.map((workflow) => `  - ${sanitizeField(workflow)}`).join('\n') : '  (not provided)'}
+
+Inferred workflows the user did not select:
+${excludedWorkflows.length ? excludedWorkflows.map((workflow) => `  - ${sanitizeField(workflow)}`).join('\n') : '  (none provided)'}
 
 Analysis scope:
   ${sanitizeField(analysisScope?.description || 'Analyze all provided tabs.')}
@@ -485,6 +503,98 @@ function buildConversationHistory(history) {
       return `${idx + 1}. ${role}: "${text}"`;
     })
     .join('\n');
+}
+
+function tokenizeText(input) {
+  const text = sanitizeField(input).toLowerCase();
+  if (!text) return [];
+  return text
+    .split(/[^a-z0-9]+/g)
+    .filter((t) => t.length > 2 && !SEMANTIC_STOPWORDS.has(t));
+}
+
+function overlapScore(sourceTokens, targetTokenSet) {
+  if (sourceTokens.length === 0 || targetTokenSet.size === 0) return 0;
+  let hits = 0;
+  for (const token of sourceTokens) {
+    if (targetTokenSet.has(token)) hits += 1;
+  }
+  return hits / sourceTokens.length;
+}
+
+function normalizeWorkflowNames(value) {
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(
+      value
+        .map((item) => sanitizeField(item).trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+const LOCAL_RELEVANT_THRESHOLD = 0.1;
+const LOCAL_EXCLUDED_PENALTY = 0.5;
+
+function buildLocalAnalysis(activeFocus, summaries, userContext, selectedWorkflows, excludedWorkflows) {
+  const contextSource = [
+    activeFocus.title,
+    activeFocus.url,
+    activeFocus.summary,
+    userContext || '',
+    ...(selectedWorkflows || []),
+  ].join(' ');
+  const contextTokens = tokenizeText(contextSource);
+  const contextSet = new Set(contextTokens);
+  const excludedTokens = tokenizeText((excludedWorkflows || []).join(' '));
+  const excludedSet = new Set(excludedTokens);
+
+  const tabDecisions = summaries.map((tab) => {
+    const tabTokens = tokenizeText(`${tab.title} ${tab.url} ${tab.summary}`);
+    const relevance = overlapScore(tabTokens, contextSet);
+    const excludedOverlap = excludedSet.size > 0 ? overlapScore(tabTokens, excludedSet) : 0;
+    const penalty = excludedOverlap * LOCAL_EXCLUDED_PENALTY;
+    const finalScore = Math.max(0, relevance - penalty);
+    const relevant = finalScore >= LOCAL_RELEVANT_THRESHOLD;
+
+    const pct = Math.round(finalScore * 100);
+    const reason = excludedOverlap > 0 && !relevant
+      ? `Score: ${pct}% — Matches an excluded workflow.`
+      : relevant
+        ? `Score: ${pct}% — Matches your workflow keywords.`
+        : `Score: ${pct}% — Low keyword overlap with your workflow.`;
+    return { index: tab.index, relevant, reason };
+  });
+
+  const currentWorkflow =
+    (selectedWorkflows || []).join(' + ') ||
+    (userContext ? userContext.slice(0, 60) : null) ||
+    (activeFocus.title ? `Working on ${activeFocus.title.slice(0, 60)}` : 'Mixed context workflow');
+
+  const keepCount = tabDecisions.filter((d) => d.relevant).length;
+  const closeCount = tabDecisions.filter((d) => !d.relevant).length;
+
+  return {
+    workflowHypotheses: [
+      {
+        name: currentWorkflow,
+        confidence: contextTokens.length > 0 ? 0.7 : 0.4,
+        evidence: 'Based on keyword matching (local analysis — no AI).',
+      },
+      ...(excludedWorkflows || []).slice(0, 2).map((workflow, idx) => ({
+        name: workflow,
+        confidence: Math.max(0.2, 0.35 - idx * 0.1),
+        evidence: 'Not selected — tabs aligned to this workflow may be flagged.',
+      })),
+    ].slice(0, 3),
+    workflowOptimization: {
+      currentWorkflow,
+      recommendation: closeCount > 0
+        ? `${keepCount} tab${keepCount !== 1 ? 's' : ''} match your workflow. ${closeCount} tab${closeCount !== 1 ? 's have' : ' has'} low keyword overlap.`
+        : 'All tabs have keyword overlap with your workflow.',
+    },
+    tabDecisions,
+  };
 }
 
 function buildWorkflowRecommendationsPrompt(activeTab, recentTabs, recentTabHistory, userContext = '') {
@@ -866,6 +976,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .catch((err) => sendResponse({ error: err.message }));
     return true;
   }
+  if (message.type === 'CLEAR_ARCHIVE') {
+    clearArchive()
+      .then(() => sendResponse({ status: 'ok' }))
+      .catch((err) => sendResponse({ error: err.message }));
+    return true;
+  }
   if (message.type === 'GET_ARCHIVE') {
     getArchive()
       .then((archive) => sendResponse({ archive }))
@@ -949,6 +1065,7 @@ async function getEffectiveSettings(message = {}) {
     apiKey: message.apiKey ?? '',
     model: message.model ?? DEFAULTS.model,
     userContext: message.userContext ?? '',
+    aiEnabled: typeof message.aiEnabled === 'boolean' ? message.aiEnabled : undefined,
   };
   const normalizedFromFrontend = {
     apiKey: fromFrontend.apiKey,
@@ -958,18 +1075,26 @@ async function getEffectiveSettings(message = {}) {
   const apiKey = normalizedFromFrontend.apiKey || fallbackSettings.apiKey;
   const model = normalizedFromFrontend.apiKey ? normalizedFromFrontend.model : fallbackSettings.model;
   const userContext = fromFrontend.userContext || fallbackSettings.userContext || '';
-  return { apiKey, model, userContext };
+  const aiEnabled = typeof fromFrontend.aiEnabled === 'boolean' ? fromFrontend.aiEnabled : fallbackSettings.aiEnabled;
+  return { apiKey, model, userContext, aiEnabled };
 }
 
 async function handleAnalyze(message = {}) {
-  const { apiKey, model, userContext } = await getEffectiveSettings(message);
-
-  if (!apiKey) throw new Error('API key not set. Open Settings to configure your key.');
+  const { apiKey, model, userContext, aiEnabled } = await getEffectiveSettings(message);
+  const useAI = typeof message.useAI === 'boolean' ? message.useAI : aiEnabled;
+  if (useAI && !apiKey) throw new Error('API key not set. Open Settings to configure your key or use semantic matching.');
 
   const allTabs = await chrome.tabs.query({ currentWindow: true });
   const activeTab = allTabs.find((t) => t.active);
   if (!activeTab) throw new Error('No active tab found.');
-  const selectedWorkflow = sanitizeField(message.selectedWorkflow).trim();
+  const selectedWorkflows = normalizeWorkflowNames(
+    Array.isArray(message.selectedWorkflows)
+      ? message.selectedWorkflows
+      : message.selectedWorkflow
+        ? [message.selectedWorkflow]
+        : []
+  );
+  const excludedWorkflows = normalizeWorkflowNames(message.excludedWorkflows);
 
   const activeSummary = await extractTabSummary(activeTab.id);
   const activeFocus = {
@@ -992,6 +1117,7 @@ async function handleAnalyze(message = {}) {
       url: tab.url ?? '',
       favicon: tab.favIconUrl ?? '',
       summary: await extractTabSummary(tab.id),
+      lastAccessed: getTabTimestamp(tab),
     }))
   );
 
@@ -1018,19 +1144,25 @@ async function handleAnalyze(message = {}) {
       source: item.source ?? 'activity',
     }));
 
-  const userMessage = buildPrompt(
-    activeFocus,
-    summaries,
-    decisions,
-    userContext,
-    recentTabHistory,
-    selectedWorkflow,
-    {
-      description: `Analyze only the ${otherTabs.length} most recent non-focus tabs by timestamp (newest first).`,
-    }
-  );
-  const raw = await callLLMText({ model, apiKey, systemMessage: SYSTEM_MESSAGE, userMessage });
-  const analysis = parseAnalyzeResponse(raw);
+  let analysis;
+  if (useAI) {
+    const userMessage = buildPrompt(
+      activeFocus,
+      summaries,
+      decisions,
+      userContext,
+      recentTabHistory,
+      selectedWorkflows,
+      excludedWorkflows,
+      {
+        description: `Analyze only the ${otherTabs.length} most recent non-focus tabs by timestamp (newest first).`,
+      }
+    );
+    const raw = await callLLMText({ model, apiKey, systemMessage: SYSTEM_MESSAGE, userMessage });
+    analysis = parseAnalyzeResponse(raw);
+  } else {
+    analysis = buildLocalAnalysis(activeFocus, summaries, userContext, selectedWorkflows, excludedWorkflows);
+  }
 
   const suggestions = analysis.tabDecisions
     .filter((r) => !r.relevant)
@@ -1057,6 +1189,7 @@ async function handleAnalyze(message = {}) {
 
 async function handleGetWorkflowRecommendations(message = {}) {
   const { apiKey, model, userContext } = await getEffectiveSettings(message);
+  const useAI = message.useAI === true;
   const tabs = await chrome.tabs.query({ currentWindow: true });
   if (tabs.length === 0) return { workflowOptions: [] };
 
@@ -1088,7 +1221,7 @@ async function handleGetWorkflowRecommendations(message = {}) {
       when: item.when ?? formatAge(item.timestamp),
     }));
 
-  if (!apiKey) {
+  if (!useAI || !apiKey) {
     const fallback = recentTabs.slice(0, 3).map((tab, idx) => ({
       name: `Working on: ${tab.title || tab.url || `Recent tab ${idx + 1}`}`,
       confidence: Math.max(0, 0.6 - idx * 0.15),

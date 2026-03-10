@@ -37,21 +37,21 @@
       <button class="primary-btn" id="analyze-btn">Analyze My Tabs</button>
       <div class="workflow-picker hidden" id="workflow-picker">
         <p class="workflow-picker-title">I think your current workflow is:</p>
-        <p class="workflow-picker-subtitle">Pick one before analysis.</p>
+        <p class="workflow-picker-subtitle">Pick every workflow you want to keep. Tabs tied to unselected workflows will be treated as distractions.</p>
         <ul class="workflow-options" id="workflow-options"></ul>
         <label class="workflow-option workflow-option-custom">
-          <input type="radio" name="workflow-option" value="custom" id="workflow-option-custom" />
+          <input type="checkbox" value="custom" id="workflow-option-custom" />
           <span>4. Other (type it out)</span>
         </label>
         <input
           type="text"
           id="workflow-custom-input"
           class="workflow-custom-input"
-          placeholder="Type your current workflow"
+          placeholder="Type another workflow you want to keep"
         />
         <p class="workflow-picker-error hidden" id="workflow-picker-error"></p>
         <div class="workflow-picker-actions">
-          <button class="primary-btn" id="workflow-confirm-btn">Analyze Selected Workflow</button>
+          <button class="primary-btn" id="workflow-confirm-btn">Analyze Selected Workflows</button>
           <button class="secondary-btn" id="workflow-cancel-btn">Cancel</button>
         </div>
       </div>
@@ -105,6 +105,9 @@
 
   <!-- Archive panel -->
   <div id="panel-archive" class="panel hidden">
+    <div class="archive-toolbar hidden" id="archive-toolbar">
+      <button class="delete-btn archive-delete-all-btn" id="archive-delete-all-btn">Delete All</button>
+    </div>
     <p class="archive-empty hidden" id="archive-empty">No archived tabs yet.</p>
     <ul class="archive-list" id="archive-list"></ul>
   </div>

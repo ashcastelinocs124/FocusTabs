@@ -1,4 +1,4 @@
-const { buildPrompt } = require('../utils/prompt');
+const { buildPrompt, buildLocalAnalysis, tokenizeText, overlapScore } = require('../utils/prompt');
 
 const activeTab = { title: 'GitHub PR #42', url: 'https://github.com/org/repo/pull/42', summary: 'Fix auth bug' };
 const otherTabs = [
@@ -88,5 +88,165 @@ describe('buildPrompt', () => {
     expect(userMessage).toContain('Recent tab history');
     expect(userMessage).toContain('[2m ago]');
     expect(userMessage).toContain('Jira Sprint Board');
+  });
+
+  test('includes selected and unselected workflow context', () => {
+    const { userMessage } = buildPrompt(
+      activeTab,
+      otherTabs,
+      decisions,
+      '',
+      recentHistory,
+      ['Sprint planning', 'PR review'],
+      ['Shopping']
+    );
+    expect(userMessage).toContain('User-selected workflows to keep');
+    expect(userMessage).toContain('Sprint planning');
+    expect(userMessage).toContain('PR review');
+    expect(userMessage).toContain('Inferred workflows the user did not select');
+    expect(userMessage).toContain('Shopping');
+  });
+});
+
+// ─── Local analysis (no AI) tests ────────────────────────────────────────────
+
+describe('tokenizeText', () => {
+  test('splits text into lowercase tokens and removes stopwords', () => {
+    const tokens = tokenizeText('The React Dashboard with Charts');
+    expect(tokens).toContain('react');
+    expect(tokens).toContain('dashboard');
+    expect(tokens).toContain('charts');
+    expect(tokens).not.toContain('the');
+    expect(tokens).not.toContain('with');
+  });
+
+  test('filters out short tokens (<=2 chars)', () => {
+    const tokens = tokenizeText('Go is a great language');
+    expect(tokens).not.toContain('go');
+    expect(tokens).not.toContain('is');
+    expect(tokens).toContain('great');
+    expect(tokens).toContain('language');
+  });
+
+  test('filters out common URL tokens', () => {
+    const tokens = tokenizeText('https://www.example.com/page.html');
+    expect(tokens).not.toContain('https');
+    expect(tokens).not.toContain('www');
+    expect(tokens).not.toContain('com');
+    expect(tokens).not.toContain('html');
+    expect(tokens).toContain('example');
+    expect(tokens).toContain('page');
+  });
+
+  test('returns empty array for empty/null input', () => {
+    expect(tokenizeText('')).toEqual([]);
+    expect(tokenizeText(null)).toEqual([]);
+    expect(tokenizeText(undefined)).toEqual([]);
+  });
+});
+
+describe('overlapScore', () => {
+  test('returns 1.0 when all source tokens exist in target', () => {
+    const score = overlapScore(['react', 'dashboard'], new Set(['react', 'dashboard', 'extra']));
+    expect(score).toBe(1.0);
+  });
+
+  test('returns 0.5 when half the source tokens match', () => {
+    const score = overlapScore(['react', 'pizza'], new Set(['react', 'dashboard']));
+    expect(score).toBe(0.5);
+  });
+
+  test('returns 0 when no tokens match', () => {
+    const score = overlapScore(['pizza', 'delivery'], new Set(['react', 'dashboard']));
+    expect(score).toBe(0);
+  });
+
+  test('returns 0 for empty inputs', () => {
+    expect(overlapScore([], new Set(['react']))).toBe(0);
+    expect(overlapScore(['react'], new Set())).toBe(0);
+  });
+});
+
+describe('buildLocalAnalysis', () => {
+  const focus = { title: 'React Dashboard Project', url: 'https://github.com/myapp', summary: 'Building a dashboard' };
+
+  test('marks tab with matching keywords as relevant', () => {
+    const tabs = [
+      { index: 0, title: 'React Docs', url: 'https://react.dev', summary: 'React documentation' },
+    ];
+    const result = buildLocalAnalysis(focus, tabs, 'React dashboard', [], []);
+    expect(result.tabDecisions[0].relevant).toBe(true);
+    expect(result.tabDecisions[0].reason).toContain('Score:');
+  });
+
+  test('marks tab with no keyword overlap as not relevant', () => {
+    const tabs = [
+      { index: 0, title: 'Best Pizza Near Me', url: 'https://google.com/search?q=pizza', summary: 'Pizza restaurants' },
+    ];
+    const result = buildLocalAnalysis(focus, tabs, 'React dashboard', [], []);
+    expect(result.tabDecisions[0].relevant).toBe(false);
+  });
+
+  test('flags tab matching an excluded workflow', () => {
+    const tabs = [
+      { index: 0, title: 'Best Pizza Near Me', url: 'https://google.com/search?q=pizza', summary: 'Pizza delivery' },
+    ];
+    const result = buildLocalAnalysis(focus, tabs, 'React dashboard', [], ['Best Pizza Near Me']);
+    expect(result.tabDecisions[0].relevant).toBe(false);
+    expect(result.tabDecisions[0].reason).toContain('excluded workflow');
+  });
+
+  test('does not penalize tabs when no excluded workflows are provided', () => {
+    const tabs = [
+      { index: 0, title: 'React Docs', url: 'https://react.dev', summary: 'Docs' },
+    ];
+    const result = buildLocalAnalysis(focus, tabs, 'React', [], []);
+    expect(result.tabDecisions[0].relevant).toBe(true);
+  });
+
+  test('returns correct workflowHypotheses structure', () => {
+    const tabs = [
+      { index: 0, title: 'Test', url: 'https://test.com', summary: '' },
+    ];
+    const result = buildLocalAnalysis(focus, tabs, '', [], []);
+    expect(result.workflowHypotheses).toHaveLength(1);
+    expect(result.workflowHypotheses[0]).toHaveProperty('name');
+    expect(result.workflowHypotheses[0]).toHaveProperty('confidence');
+    expect(result.workflowHypotheses[0]).toHaveProperty('evidence');
+  });
+
+  test('includes excluded workflows in hypotheses', () => {
+    const tabs = [
+      { index: 0, title: 'Test', url: 'https://test.com', summary: '' },
+    ];
+    const result = buildLocalAnalysis(focus, tabs, '', ['React dev'], ['Shopping', 'Gaming']);
+    expect(result.workflowHypotheses.length).toBeGreaterThanOrEqual(2);
+    expect(result.workflowHypotheses.some((h) => h.name === 'Shopping')).toBe(true);
+  });
+
+  test('workflowOptimization reflects keep/close counts', () => {
+    const tabs = [
+      { index: 0, title: 'React Hooks Guide', url: 'https://react.dev/hooks', summary: 'React hooks' },
+      { index: 1, title: 'Pizza Delivery', url: 'https://pizza.com', summary: 'Order pizza' },
+    ];
+    const result = buildLocalAnalysis(focus, tabs, 'React dashboard', [], []);
+    expect(result.workflowOptimization.recommendation).toMatch(/\d+ tab/);
+  });
+
+  test('handles empty summaries array', () => {
+    const result = buildLocalAnalysis(focus, [], 'React', [], []);
+    expect(result.tabDecisions).toEqual([]);
+    expect(result.workflowOptimization.recommendation).toContain('All tabs');
+  });
+
+  test('uses userContext for relevance when provided', () => {
+    const tabs = [
+      { index: 0, title: 'Chart.js Examples', url: 'https://chartjs.org', summary: 'Bar charts examples' },
+    ];
+    const withoutCtx = buildLocalAnalysis(focus, tabs, '', [], []);
+    const withCtx = buildLocalAnalysis(focus, tabs, 'Building charts for React dashboard', [], []);
+    const scoreWithout = parseInt(withoutCtx.tabDecisions[0].reason.match(/Score: (\d+)%/)[1]);
+    const scoreWith = parseInt(withCtx.tabDecisions[0].reason.match(/Score: (\d+)%/)[1]);
+    expect(scoreWith).toBeGreaterThanOrEqual(scoreWithout);
   });
 });

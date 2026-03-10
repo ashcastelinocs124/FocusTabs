@@ -459,6 +459,16 @@ body {
 .results-actions .secondary-btn { margin-top: 0; }
 
 /* ─── Archive Panel ──────────────────────────────────────────────────── */
+.archive-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.archive-delete-all-btn {
+  padding: 6px 10px;
+}
+
 .archive-empty {
   color: var(--muted);
   font-size: 12px;

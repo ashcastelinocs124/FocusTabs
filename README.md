@@ -8,24 +8,27 @@ FocusTabs is a Chrome extension (Manifest V3) that uses a cloud LLM to analyze y
 
 ## How It Works
 
-1. **You open FocusTabs** (toolbar icon or auto-trigger at 10+ tabs)
+1. **You open FocusTabs** (toolbar icon or auto-trigger at 5+ tabs)
 2. The extension reads your active tab as your **focus signal** — the thing you're working on right now
 3. It extracts the title, URL, and a ~500-character content summary from every other open tab
-4. That data is sent to your chosen LLM, which scores each tab as **relevant** or **not relevant** to your focus
-5. You review the suggestions as a checklist, uncheck anything you want to keep, and close the rest
-6. Closed tabs go into an **archive** — you can restore them at any time
+4. **With AI enabled:** that data is sent to your chosen LLM, which scores each tab as **relevant** or **not relevant**
+5. **Without AI (local mode):** tabs are scored using keyword overlap between your workflow context and each tab's title/URL — no API key needed, instant results
+6. You review the suggestions as a checklist, uncheck anything you want to keep, and close the rest
+7. Closed tabs go into an **archive** — you can restore them at any time
 
-The LLM also incorporates your **past decisions** (up to 20 most recent) as learning context, so it gets smarter about your patterns over time.
+The LLM path also incorporates your **past decisions** (up to 20 most recent) as learning context, so it gets smarter about your patterns over time.
 
 ---
 
 ## Features
 
-- **AI-powered relevance scoring** — tabs are judged against your current focus, not a fixed set of rules
+- **AI-powered relevance scoring** — tabs are judged against your current focus using a cloud LLM
+- **Local keyword analysis (no AI)** — pure keyword overlap scoring between your workflow and tab titles/URLs. No API key needed, instant results
+- **Excluded workflow penalty** — tabs matching workflows you deselect are penalized and flagged for closing
 - **Tab Chat** — ask a natural language question across all your open tabs (e.g. "which tabs are about the auth bug?")
-- **Archive + restore** — closed tabs are saved with a timestamp and can be reopened with one click
+- **Archive + restore** — closed tabs are saved with a timestamp and can be reopened with one click. Includes a "Delete All" option to clear the archive
 - **Multi-provider LLM support** — OpenAI, Anthropic, and Google Gemini all work out of the box
-- **Auto-prompt** — optionally trigger the popup automatically when you have 10 or more tabs open
+- **Auto-prompt** — optionally trigger the popup automatically when you have 5 or more tabs open
 - **Inline prompt fallback** — if the popup can't be opened programmatically, a non-intrusive in-page prompt appears instead
 - **Learns from you** — past keep/close decisions are sent to the LLM as context with each new analysis
 - **No content scripts** — all tab analysis happens in the background service worker; no persistent page injection
@@ -130,10 +133,14 @@ The popup communicates with the background worker via `chrome.runtime.sendMessag
 
 | Message type | Payload | Response |
 |---|---|---|
-| `ANALYZE` | `{ apiKey?, model? }` | `{ suggestions[], focusTab }` |
+| `ANALYZE` | `{ apiKey?, model?, useAI?, selectedWorkflows[], excludedWorkflows[] }` | `{ suggestions[], focusTab, workflowHypotheses[], workflowOptimization }` |
+| `GET_WORKFLOW_RECOMMENDATIONS` | `{ useAI? }` | `{ workflowOptions[] }` |
 | `CHAT_TABS` | `{ query, history[], apiKey?, model? }` | `{ answer, relevantTabs[] }` |
 | `ARCHIVE_TABS` | `{ tabIds[], tabs[] }` | `{ status: 'ok' }` |
-| `RESTORE_TAB` | `{ url }` | `{ status: 'ok' }` |
+| `CLOSE_TABS` | `{ tabIds[], tabs[] }` | `{ status: 'ok' }` |
+| `RESTORE_TAB` | `{ url, archivedAt? }` | `{ status: 'ok' }` |
+| `DELETE_ARCHIVE_ENTRY` | `{ url, archivedAt? }` | `{ status: 'ok' }` |
+| `CLEAR_ARCHIVE` | — | `{ status: 'ok' }` |
 | `GET_ARCHIVE` | — | `{ archive[] }` |
 
 ---
@@ -173,7 +180,7 @@ npm install    # install Jest and jest-chrome (dev deps only — not bundled int
 npm test       # run all unit tests
 ```
 
-Tests use [jest-chrome](https://github.com/nickmccurdy/jest-chrome) to mock the Chrome extension APIs. There are 35 unit tests covering LLM response parsing, model routing, provider detection, and storage operations.
+Tests use [jest-chrome](https://github.com/nickmccurdy/jest-chrome) to mock the Chrome extension APIs. There are 61 unit tests covering LLM response parsing, model routing, provider detection, storage operations, and local keyword analysis scoring.
 
 **Note:** jest-chrome 0.8.0 requires Jest 27. Do not upgrade to Jest 28/29 without verifying compatibility.
 
