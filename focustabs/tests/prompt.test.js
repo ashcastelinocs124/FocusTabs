@@ -233,6 +233,14 @@ describe('buildLocalAnalysis', () => {
     expect(result.workflowOptimization.recommendation).toMatch(/\d+ tab/);
   });
 
+  test('uses all selected workflows in currentWorkflow', () => {
+    const tabs = [
+      { index: 0, title: 'React Hooks Guide', url: 'https://react.dev/hooks', summary: 'React hooks' },
+    ];
+    const result = buildLocalAnalysis(focus, tabs, '', ['Sprint planning', 'PR review'], []);
+    expect(result.workflowOptimization.currentWorkflow).toBe('Sprint planning + PR review');
+  });
+
   test('handles empty summaries array', () => {
     const result = buildLocalAnalysis(focus, [], 'React', [], []);
     expect(result.tabDecisions).toEqual([]);

@@ -1182,6 +1182,7 @@ async function handleAnalyze(message = {}) {
   return {
     suggestions,
     focusTab: activeFocus,
+    keptWorkflows: selectedWorkflows,
     workflowHypotheses: analysis.workflowHypotheses,
     workflowOptimization: analysis.workflowOptimization,
   };

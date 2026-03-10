@@ -138,6 +138,7 @@ async function runAnalysis(selectedWorkflows = [], excludedWorkflows = []) {
     if (result.error) throw new Error(result.error);
     currentSuggestions = result.suggestions ?? [];
     renderResults(currentSuggestions, {
+      keptWorkflows: result.keptWorkflows ?? selectedWorkflows,
       workflowHypotheses: result.workflowHypotheses ?? [],
       workflowOptimization: result.workflowOptimization ?? {},
     });
@@ -281,7 +282,11 @@ function resetChatHistoryIfNeeded() {
 }
 
 function renderResults(suggestions, workflowAnalysis = {}) {
-  renderWorkflowInsights(workflowAnalysis.workflowHypotheses, workflowAnalysis.workflowOptimization);
+  renderWorkflowInsights(
+    workflowAnalysis.workflowHypotheses,
+    workflowAnalysis.workflowOptimization,
+    workflowAnalysis.keptWorkflows
+  );
 
   if (suggestions.length === 0) {
     $("#results-header").textContent = "All tabs look relevant to your current focus.";
@@ -314,14 +319,22 @@ function renderResults(suggestions, workflowAnalysis = {}) {
   showState("results");
 }
 
-function renderWorkflowInsights(hypotheses = [], workflowOptimization = {}) {
+function renderWorkflowInsights(hypotheses = [], workflowOptimization = {}, keptWorkflows = []) {
   const wrapper = $("#workflow-insights");
   const current = $("#workflow-current");
   const list = $("#workflow-hypotheses");
   const optimization = $("#workflow-optimization");
 
   const normalizedHypotheses = hypotheses.slice(0, 3);
-  if (!workflowOptimization?.currentWorkflow && normalizedHypotheses.length === 0) {
+  const normalizedKeptWorkflows = Array.from(
+    new Set(
+      (Array.isArray(keptWorkflows) ? keptWorkflows : [])
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+    )
+  );
+
+  if (!workflowOptimization?.currentWorkflow && normalizedHypotheses.length === 0 && normalizedKeptWorkflows.length === 0) {
     wrapper.classList.add("hidden");
     current.textContent = "";
     list.innerHTML = "";
@@ -330,7 +343,9 @@ function renderWorkflowInsights(hypotheses = [], workflowOptimization = {}) {
   }
 
   wrapper.classList.remove("hidden");
-  const currentWorkflow = workflowOptimization?.currentWorkflow || "Likely in a mixed context workflow";
+  const currentWorkflow = normalizedKeptWorkflows.length > 0
+    ? normalizedKeptWorkflows.join(", ")
+    : workflowOptimization?.currentWorkflow || "Likely in a mixed context workflow";
   current.textContent = `Kept workflows: ${currentWorkflow}`;
 
   list.innerHTML = "";
