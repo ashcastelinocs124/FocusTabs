@@ -72,6 +72,8 @@ describe('callLLM', () => {
     const body = JSON.parse(global.fetch.mock.calls[0][1].body);
     expect(body.instructions).toBe('sys');
     expect(body.input).toBe('user');
+    expect(body.reasoning).toEqual({ effort: 'minimal' });
+    expect(body.text).toEqual({ verbosity: 'low' });
     expect(result).toHaveLength(1);
   });
 

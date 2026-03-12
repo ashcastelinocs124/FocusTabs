@@ -10,6 +10,10 @@ const ENDPOINTS = {
   'gemini-pro': 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
 };
 const OPENAI_CHAT_COMPLETIONS_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
+const OPENAI_RESPONSES_OPTIONS = {
+  reasoning: { effort: 'minimal' },
+  text: { verbosity: 'low' },
+};
 
 // Maps short model keys to the full versioned model IDs required by each API
 const ANTHROPIC_MODEL_IDS = {
@@ -51,6 +55,7 @@ async function callOpenAI({ apiKey, model, systemMessage, userMessage }) {
     model,
     instructions: systemMessage,
     input: userMessage,
+    ...OPENAI_RESPONSES_OPTIONS,
   };
   const chatBody = {
     model,

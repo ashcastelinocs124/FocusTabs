@@ -780,6 +780,11 @@ function fetchWithTimeout(url, options, ms = 60000) {
   return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
 }
 
+const OPENAI_RESPONSES_OPTIONS = {
+  reasoning: { effort: 'minimal' },
+  text: { verbosity: 'low' },
+};
+
 async function callLLMText({ model, apiKey, systemMessage, userMessage }) {
   let response, data, content;
 
@@ -790,6 +795,7 @@ async function callLLMText({ model, apiKey, systemMessage, userMessage }) {
       model,
       instructions: systemMessage,
       input: userMessage,
+      ...OPENAI_RESPONSES_OPTIONS,
     };
     const chatBody = {
       model,
